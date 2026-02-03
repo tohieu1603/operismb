@@ -356,7 +356,7 @@ class ChatService {
       }
 
       const data = await response.json();
-      console.log("[chat] Gateway response usage:", JSON.stringify(data.usage));
+      console.log("[chat] Gateway response usage:", JSON.stringify(data.usage), "| Estimated if 0");
 
       // Parse OpenAI-compatible response to Anthropic format
       const choice = data.choices?.[0];
@@ -389,8 +389,13 @@ class ChatService {
       }
 
       // Calculate usage and cost
-      const inputTokens = data.usage?.prompt_tokens || 0;
-      const outputTokens = data.usage?.completion_tokens || 0;
+      // If gateway doesn't return usage, estimate from text (~4 chars per token)
+      const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+      const inputText = apiMessages.map(m => m.content).join(" ");
+      const outputText = responseMessage?.content || "";
+
+      const inputTokens = data.usage?.prompt_tokens || estimateTokens(inputText);
+      const outputTokens = data.usage?.completion_tokens || estimateTokens(outputText);
       const model = data.model || DEFAULT_MODEL;
       const pricing = PRICING[model as keyof typeof PRICING] || PRICING["claude-sonnet-4-20250514"];
 
