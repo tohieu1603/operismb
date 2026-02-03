@@ -35,18 +35,22 @@ function estimateTokens(text: string): number {
 }
 
 /**
- * Generate conversation ID
+ * Generate UUID v4 for conversation ID
  */
 function generateConversationId(): string {
-  return `conv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  return crypto.randomUUID();
 }
 
 /**
- * Send SSE event to client
+ * Send SSE event to client with flush for realtime delivery
  */
 function sendSSE(res: Response, event: string, data: unknown): void {
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
+  // Flush for realtime delivery through proxies
+  if (typeof (res as unknown as { flush?: () => void }).flush === "function") {
+    (res as unknown as { flush: () => void }).flush();
+  }
 }
 
 /**
@@ -77,14 +81,19 @@ async function streamMessage(
     content: message,
   });
 
-  // Setup SSE headers
+  // Setup SSE headers (Cloudflare + Nginx compatible)
   res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("Transfer-Encoding", "chunked");
+  res.flushHeaders();
 
   // Send conversation ID first
   sendSSE(res, "meta", { conversationId: convId });
+  if (typeof (res as unknown as { flush?: () => void }).flush === "function") {
+    (res as unknown as { flush: () => void }).flush();
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
