@@ -356,6 +356,7 @@ class ChatService {
       }
 
       const data = await response.json();
+      console.log("[chat] Gateway response usage:", JSON.stringify(data.usage));
 
       // Parse OpenAI-compatible response to Anthropic format
       const choice = data.choices?.[0];
