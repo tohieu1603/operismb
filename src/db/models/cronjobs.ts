@@ -1,0 +1,392 @@
+/**
+ * Cronjob Repository
+ * CRUD operations for cronjobs and cronjob_executions tables
+ */
+
+import { queryOne, queryAll, transaction } from "../connection.js";
+import type {
+  Cronjob,
+  CronjobCreate,
+  CronjobUpdate,
+  CronjobExecution,
+  CronjobExecutionCreate,
+} from "./types.js";
+
+// ============================================================================
+// Cronjob CRUD
+// ============================================================================
+
+/**
+ * Create a new cronjob
+ */
+export async function createCronjob(data: CronjobCreate): Promise<Cronjob> {
+  const result = await queryOne<Cronjob>(
+    `INSERT INTO cronjobs (
+      box_id, customer_id, name, schedule, action, task, enabled, next_run_at, metadata
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *`,
+    [
+      data.box_id,
+      data.customer_id,
+      data.name,
+      data.schedule,
+      data.action,
+      data.task ?? null,
+      data.enabled ?? true,
+      data.next_run_at ?? null,
+      JSON.stringify(data.metadata ?? {}),
+    ],
+  );
+
+  if (!result) {
+    throw new Error("Failed to create cronjob");
+  }
+
+  return result;
+}
+
+/**
+ * Get cronjob by ID
+ */
+export async function getCronjobById(id: string): Promise<Cronjob | null> {
+  return queryOne<Cronjob>("SELECT * FROM cronjobs WHERE id = $1", [id]);
+}
+
+/**
+ * Update cronjob
+ */
+export async function updateCronjob(id: string, data: CronjobUpdate): Promise<Cronjob | null> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let paramIndex = 1;
+
+  if (data.name !== undefined) {
+    fields.push(`name = $${paramIndex++}`);
+    values.push(data.name);
+  }
+  if (data.schedule !== undefined) {
+    fields.push(`schedule = $${paramIndex++}`);
+    values.push(data.schedule);
+  }
+  if (data.action !== undefined) {
+    fields.push(`action = $${paramIndex++}`);
+    values.push(data.action);
+  }
+  if (data.task !== undefined) {
+    fields.push(`task = $${paramIndex++}`);
+    values.push(data.task);
+  }
+  if (data.enabled !== undefined) {
+    fields.push(`enabled = $${paramIndex++}`);
+    values.push(data.enabled);
+  }
+  if (data.last_run_at !== undefined) {
+    fields.push(`last_run_at = $${paramIndex++}`);
+    values.push(data.last_run_at);
+  }
+  if (data.next_run_at !== undefined) {
+    fields.push(`next_run_at = $${paramIndex++}`);
+    values.push(data.next_run_at);
+  }
+  if (data.metadata !== undefined) {
+    fields.push(`metadata = $${paramIndex++}`);
+    values.push(JSON.stringify(data.metadata));
+  }
+
+  if (fields.length === 0) {
+    return getCronjobById(id);
+  }
+
+  values.push(id);
+
+  return queryOne<Cronjob>(
+    `UPDATE cronjobs SET ${fields.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
+    values,
+  );
+}
+
+/**
+ * Delete cronjob
+ */
+export async function deleteCronjob(id: string): Promise<boolean> {
+  const result = await queryOne<{ id: string }>("DELETE FROM cronjobs WHERE id = $1 RETURNING id", [
+    id,
+  ]);
+  return result !== null;
+}
+
+/**
+ * List cronjobs for a box
+ */
+export async function listCronjobsByBox(
+  boxId: string,
+  options?: {
+    enabled?: boolean;
+    limit?: number;
+    offset?: number;
+  },
+): Promise<{ cronjobs: Cronjob[]; total: number }> {
+  const limit = options?.limit ?? 100;
+  const offset = options?.offset ?? 0;
+  const params: unknown[] = [boxId];
+
+  let whereClause = "WHERE box_id = $1";
+
+  if (options?.enabled !== undefined) {
+    whereClause += ` AND enabled = $${params.length + 1}`;
+    params.push(options.enabled);
+  }
+
+  const countResult = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) as count FROM cronjobs ${whereClause}`,
+    params,
+  );
+
+  const cronjobs = await queryAll<Cronjob>(
+    `SELECT * FROM cronjobs ${whereClause}
+     ORDER BY created_at DESC
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset],
+  );
+
+  return {
+    cronjobs,
+    total: parseInt(countResult?.count ?? "0", 10),
+  };
+}
+
+/**
+ * List cronjobs for a customer
+ */
+export async function listCronjobsByCustomer(
+  customerId: string,
+  options?: {
+    boxId?: string;
+    enabled?: boolean;
+    limit?: number;
+    offset?: number;
+  },
+): Promise<{ cronjobs: Cronjob[]; total: number }> {
+  const limit = options?.limit ?? 100;
+  const offset = options?.offset ?? 0;
+  const params: unknown[] = [customerId];
+
+  let whereClause = "WHERE customer_id = $1";
+
+  if (options?.boxId) {
+    whereClause += ` AND box_id = $${params.length + 1}`;
+    params.push(options.boxId);
+  }
+  if (options?.enabled !== undefined) {
+    whereClause += ` AND enabled = $${params.length + 1}`;
+    params.push(options.enabled);
+  }
+
+  const countResult = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) as count FROM cronjobs ${whereClause}`,
+    params,
+  );
+
+  const cronjobs = await queryAll<Cronjob>(
+    `SELECT * FROM cronjobs ${whereClause}
+     ORDER BY created_at DESC
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset],
+  );
+
+  return {
+    cronjobs,
+    total: parseInt(countResult?.count ?? "0", 10),
+  };
+}
+
+/**
+ * Get cronjobs that are due to run
+ */
+export async function getDueCronjobs(limit: number = 100): Promise<Cronjob[]> {
+  return queryAll<Cronjob>(
+    `SELECT * FROM cronjobs
+     WHERE enabled = true AND next_run_at <= NOW()
+     ORDER BY next_run_at ASC
+     LIMIT $1`,
+    [limit],
+  );
+}
+
+/**
+ * Toggle cronjob enabled status
+ */
+export async function toggleCronjob(id: string, enabled: boolean): Promise<Cronjob | null> {
+  return queryOne<Cronjob>("UPDATE cronjobs SET enabled = $1 WHERE id = $2 RETURNING *", [
+    enabled,
+    id,
+  ]);
+}
+
+// ============================================================================
+// Cronjob Execution CRUD
+// ============================================================================
+
+/**
+ * Create a new execution record
+ */
+export async function createExecution(data: CronjobExecutionCreate): Promise<CronjobExecution> {
+  const result = await queryOne<CronjobExecution>(
+    `INSERT INTO cronjob_executions (
+      cronjob_id, status, started_at, metadata
+    ) VALUES ($1, $2, $3, $4)
+    RETURNING *`,
+    [
+      data.cronjob_id,
+      data.status ?? "running",
+      data.started_at ?? new Date(),
+      JSON.stringify(data.metadata ?? {}),
+    ],
+  );
+
+  if (!result) {
+    throw new Error("Failed to create cronjob execution");
+  }
+
+  return result;
+}
+
+/**
+ * Complete an execution
+ */
+export async function completeExecution(
+  id: string,
+  data: {
+    status: "success" | "failure";
+    output?: string;
+    error?: string;
+  },
+): Promise<CronjobExecution | null> {
+  const finishedAt = new Date();
+
+  // Get the execution to calculate duration
+  const execution = await queryOne<CronjobExecution>(
+    "SELECT * FROM cronjob_executions WHERE id = $1",
+    [id],
+  );
+
+  if (!execution) return null;
+
+  const durationMs = finishedAt.getTime() - new Date(execution.started_at).getTime();
+
+  return queryOne<CronjobExecution>(
+    `UPDATE cronjob_executions SET
+      status = $1,
+      finished_at = $2,
+      duration_ms = $3,
+      output = $4,
+      error = $5
+     WHERE id = $6
+     RETURNING *`,
+    [data.status, finishedAt, durationMs, data.output ?? null, data.error ?? null, id],
+  );
+}
+
+/**
+ * Get execution by ID
+ */
+export async function getExecutionById(id: string): Promise<CronjobExecution | null> {
+  return queryOne<CronjobExecution>("SELECT * FROM cronjob_executions WHERE id = $1", [id]);
+}
+
+/**
+ * List executions for a cronjob
+ */
+export async function listExecutionsByCronjob(
+  cronjobId: string,
+  options?: {
+    status?: string;
+    limit?: number;
+    offset?: number;
+  },
+): Promise<{ executions: CronjobExecution[]; total: number }> {
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+  const params: unknown[] = [cronjobId];
+
+  let whereClause = "WHERE cronjob_id = $1";
+
+  if (options?.status) {
+    whereClause += ` AND status = $${params.length + 1}`;
+    params.push(options.status);
+  }
+
+  const countResult = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) as count FROM cronjob_executions ${whereClause}`,
+    params,
+  );
+
+  const executions = await queryAll<CronjobExecution>(
+    `SELECT * FROM cronjob_executions ${whereClause}
+     ORDER BY started_at DESC
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset],
+  );
+
+  return {
+    executions,
+    total: parseInt(countResult?.count ?? "0", 10),
+  };
+}
+
+/**
+ * Run a cronjob (create execution, update last_run_at)
+ * Returns the execution record
+ */
+export async function startCronjobRun(cronjobId: string): Promise<CronjobExecution> {
+  return await transaction(async (client) => {
+    // Update the cronjob's last_run_at
+    await client.query("UPDATE cronjobs SET last_run_at = NOW() WHERE id = $1", [cronjobId]);
+
+    // Create the execution record
+    const result = await client.query<CronjobExecution>(
+      `INSERT INTO cronjob_executions (cronjob_id, status, started_at)
+       VALUES ($1, 'running', NOW())
+       RETURNING *`,
+      [cronjobId],
+    );
+
+    if (!result.rows[0]) {
+      throw new Error("Failed to create cronjob execution");
+    }
+
+    return result.rows[0];
+  });
+}
+
+/**
+ * Delete old executions
+ * (for cleanup/retention policy)
+ */
+export async function deleteOldExecutions(olderThanDays: number = 30): Promise<number> {
+  const result = await queryAll<{ id: string }>(
+    `DELETE FROM cronjob_executions
+     WHERE started_at < NOW() - INTERVAL '${olderThanDays} days'
+     RETURNING id`,
+  );
+  return result.length;
+}
+
+export default {
+  // Cronjob
+  createCronjob,
+  getCronjobById,
+  updateCronjob,
+  deleteCronjob,
+  listCronjobsByBox,
+  listCronjobsByCustomer,
+  getDueCronjobs,
+  toggleCronjob,
+  // Execution
+  createExecution,
+  completeExecution,
+  getExecutionById,
+  listExecutionsByCronjob,
+  startCronjobRun,
+  deleteOldExecutions,
+};

@@ -1,0 +1,89 @@
+/**
+ * Token Controller
+ * Handles HTTP requests for token balance and transactions
+ */
+
+import type { Request, Response } from "express";
+import { tokenService } from "../services/token.service.js";
+
+class TokenController {
+  async getBalance(req: Request, res: Response): Promise<void> {
+    const balance = await tokenService.getBalance(req.user!.userId);
+    res.json({ balance });
+  }
+
+  async getTransactions(req: Request, res: Response): Promise<void> {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const type = req.query.type as string | undefined;
+
+    const result = await tokenService.getTransactions(req.user!.userId, page, limit, type);
+    res.json({
+      transactions: result.transactions,
+      pagination: {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages,
+      },
+    });
+  }
+
+  // Admin: Get user's transactions
+  async getUserTransactions(req: Request, res: Response): Promise<void> {
+    const userId = req.params.userId as string;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const type = req.query.type as string | undefined;
+
+    const result = await tokenService.getTransactions(userId, page, limit, type);
+    res.json({
+      transactions: result.transactions,
+      pagination: {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages,
+      },
+    });
+  }
+
+  async credit(req: Request, res: Response): Promise<void> {
+    const { userId, amount, description } = req.body;
+    const result = await tokenService.credit(userId, amount, description || "Admin credit");
+    res.json(result);
+  }
+
+  async debit(req: Request, res: Response): Promise<void> {
+    const { userId, amount, description } = req.body;
+    const result = await tokenService.debit(userId, amount, description || "Admin debit");
+    res.json(result);
+  }
+
+  async adjust(req: Request, res: Response): Promise<void> {
+    const { userId, amount, description } = req.body;
+    const result = await tokenService.adjust(userId, amount, description || "Admin adjustment");
+    res.json(result);
+  }
+
+  // Admin: Get all transactions across all users
+  async getAllTransactions(req: Request, res: Response): Promise<void> {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const type = req.query.type as string | undefined;
+    const userId = req.query.userId as string | undefined;
+
+    const result = await tokenService.getAllTransactions(page, limit, type, userId);
+    res.json({
+      transactions: result.transactions,
+      pagination: {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages,
+      },
+    });
+  }
+}
+
+export const tokenController = new TokenController();
