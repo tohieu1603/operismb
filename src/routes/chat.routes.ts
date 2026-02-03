@@ -5,6 +5,7 @@
 
 import { Router } from "express";
 import { chatController } from "../controllers/chat.controller.js";
+import { chatStreamController } from "../controllers/chat-stream.controller.js";
 import { authMiddleware, hybridAuthMiddleware, asyncHandler } from "../middleware/index.js";
 
 const router = Router();
@@ -16,6 +17,15 @@ router.post(
     await hybridAuthMiddleware(req, res, next);
   }),
   asyncHandler((req, res) => chatController.sendMessage(req, res)),
+);
+
+// Streaming chat via SSE
+router.post(
+  "/stream",
+  asyncHandler(async (req, res, next) => {
+    await hybridAuthMiddleware(req, res, next);
+  }),
+  (req, res) => chatStreamController.streamMessage(req, res),
 );
 
 // Balance check requires JWT
