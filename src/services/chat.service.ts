@@ -328,6 +328,7 @@ class ChatService {
       : undefined;
 
     console.log("[chat] Calling user gateway:", gatewayUrl);
+    console.log("[chat] Gateway token:", gatewayToken?.slice(0, 10) + "...");
     console.log("[chat] Messages:", apiMessages.length, "| Tools:", apiTools?.length ?? 0);
 
     try {
