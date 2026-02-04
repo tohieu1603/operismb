@@ -18,6 +18,7 @@ export * as tokenTransactions from "./token-transactions.js";
 export * as deposits from "./deposits.js";
 export * as settings from "./settings.js";
 export * as chatMessages from "./chat-messages.js";
+export * as tokenUsage from "./token-usage.js";
 
 // Default exports for convenience
 export { default as customersRepo } from "./customers.js";
@@ -31,3 +32,4 @@ export { default as tokenTransactionsRepo } from "./token-transactions.js";
 export { default as depositsRepo } from "./deposits.js";
 export { default as settingsRepo } from "./settings.js";
 export { chatMessagesRepo } from "./chat-messages.js";
+export { default as tokenUsageRepo } from "./token-usage.js";

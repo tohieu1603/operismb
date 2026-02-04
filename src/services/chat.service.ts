@@ -8,6 +8,7 @@
 import crypto from "node:crypto";
 import { Errors } from "../core/errors/api-error.js";
 import { tokenService } from "./token.service.js";
+import { analyticsService } from "./analytics.service.js";
 import { usersRepo, chatMessagesRepo } from "../db/index.js";
 import { moltbotClientService } from "./moltbot-client.service.js";
 
@@ -265,6 +266,21 @@ class ChatService {
 
     if (tokensToDeduct > 0) {
       await tokenService.debit(userId, tokensToDeduct, `Chat: ${message.slice(0, 30)}...`);
+
+      // Record usage for analytics
+      await analyticsService.recordUsage({
+        user_id: userId,
+        request_type: "chat",
+        request_id: convId,
+        model: aiResponse.model,
+        input_tokens: aiResponse.usage.input_tokens,
+        output_tokens: aiResponse.usage.output_tokens,
+        total_tokens: tokensToDeduct,
+        cost_tokens: tokensToDeduct,
+        metadata: {
+          message_preview: message.slice(0, 50),
+        },
+      });
     }
 
     const updatedUser = await usersRepo.getUserById(userId);

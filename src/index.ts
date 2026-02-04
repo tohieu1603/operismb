@@ -13,6 +13,9 @@ import {
   chatRoutes,
   depositRoutes,
   settingsRoutes,
+  cronRoutes,
+  gatewayProxyRoutes,
+  analyticsRoutes,
 } from "./routes/index.js";
 import { errorMiddleware } from "./middleware/index.js";
 
@@ -31,6 +34,9 @@ operisRouter.use("/tokens", tokenRoutes);
 operisRouter.use("/chat", chatRoutes);
 operisRouter.use("/deposits", depositRoutes);
 operisRouter.use("/settings", settingsRoutes);
+operisRouter.use("/cron", cronRoutes);
+operisRouter.use("/v1/gateway", gatewayProxyRoutes);
+operisRouter.use("/analytics", analyticsRoutes);
 
 // Global error handler - must be last
 operisRouter.use(errorMiddleware);

@@ -8,6 +8,7 @@
 import type { Response } from "express";
 import { Errors } from "../core/errors/api-error.js";
 import { tokenService } from "./token.service.js";
+import { analyticsService } from "./analytics.service.js";
 import { usersRepo, chatMessagesRepo } from "../db/index.js";
 
 // Config
@@ -183,6 +184,22 @@ async function streamMessage(
     // Deduct tokens
     if (totalTokens > 0) {
       await tokenService.debit(userId, totalTokens, `Chat: ${message.slice(0, 30)}...`);
+
+      // Record usage for analytics
+      await analyticsService.recordUsage({
+        user_id: userId,
+        request_type: "chat",
+        request_id: convId,
+        model: DEFAULT_MODEL,
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        total_tokens: totalTokens,
+        cost_tokens: totalTokens,
+        metadata: {
+          message_preview: message.slice(0, 50),
+          stream: true,
+        },
+      });
     }
 
     // Save assistant response

@@ -191,7 +191,7 @@ export interface CronjobUpdate {
   task?: string;
   enabled?: boolean;
   last_run_at?: Date;
-  next_run_at?: Date;
+  next_run_at?: Date | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -292,6 +292,7 @@ export interface User {
   // Custom Moltbot gateway for AI calls
   gateway_url: string | null;
   gateway_token: string | null;
+  gateway_hooks_token: string | null; // Separate token for /hooks/* endpoints
   created_at: Date;
   updated_at: Date;
 }
@@ -316,6 +317,7 @@ export interface UserUpdate {
   token_balance?: number;
   gateway_url?: string | null;
   gateway_token?: string | null;
+  gateway_hooks_token?: string | null;
 }
 
 // ============================================================================
@@ -375,4 +377,57 @@ export interface TokenTransactionCreate {
   balance_after: number;
   description?: string;
   reference_id?: string;
+}
+
+// ============================================================================
+// Token Usage Analytics Types
+// ============================================================================
+export interface TokenUsage {
+  id: string;
+  user_id: string;
+  request_type: RequestType;
+  request_id: string | null;
+  model: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost_tokens: number;
+  metadata: Record<string, unknown>;
+  created_at: Date;
+}
+
+export type RequestType = "chat" | "cronjob" | "api";
+
+export interface TokenUsageCreate {
+  user_id: string;
+  request_type: RequestType;
+  request_id?: string;
+  model?: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens?: number;
+  cost_tokens?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface TokenUsageStats {
+  total_requests: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_tokens: number;
+  total_cost_tokens: number;
+}
+
+export interface TokenUsageByType extends TokenUsageStats {
+  request_type: RequestType;
+}
+
+export interface TokenUsageByDate extends TokenUsageStats {
+  date: string;
+}
+
+export interface TokenUsageByUser extends TokenUsageStats {
+  user_id: string;
+  user_email: string;
+  user_name: string;
 }

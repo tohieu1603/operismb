@@ -215,12 +215,22 @@ export async function getDueCronjobs(limit: number = 100): Promise<Cronjob[]> {
 
 /**
  * Toggle cronjob enabled status
+ * When disabling, also clears next_run_at to prevent scheduling
  */
 export async function toggleCronjob(id: string, enabled: boolean): Promise<Cronjob | null> {
-  return queryOne<Cronjob>("UPDATE cronjobs SET enabled = $1 WHERE id = $2 RETURNING *", [
-    enabled,
-    id,
-  ]);
+  if (enabled) {
+    // When enabling, just set enabled = true (next_run_at will be recalculated on next tick)
+    return queryOne<Cronjob>("UPDATE cronjobs SET enabled = $1 WHERE id = $2 RETURNING *", [
+      enabled,
+      id,
+    ]);
+  } else {
+    // When disabling, also clear next_run_at to ensure job won't run
+    return queryOne<Cronjob>(
+      "UPDATE cronjobs SET enabled = $1, next_run_at = NULL WHERE id = $2 RETURNING *",
+      [enabled, id],
+    );
+  }
 }
 
 // ============================================================================
@@ -372,6 +382,54 @@ export async function deleteOldExecutions(olderThanDays: number = 30): Promise<n
   return result.length;
 }
 
+/**
+ * List all cronjobs (admin) with user info
+ */
+export async function listAllCronjobs(options?: {
+  userId?: string;
+  enabled?: boolean;
+  limit?: number;
+  offset?: number;
+}): Promise<{
+  cronjobs: (Cronjob & { user_email?: string; user_name?: string })[];
+  total: number;
+}> {
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+  const params: unknown[] = [];
+
+  let whereClause = "WHERE 1=1";
+
+  if (options?.userId) {
+    params.push(options.userId);
+    whereClause += ` AND c.customer_id = $${params.length}`;
+  }
+  if (options?.enabled !== undefined) {
+    params.push(options.enabled);
+    whereClause += ` AND c.enabled = $${params.length}`;
+  }
+
+  const countResult = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) as count FROM cronjobs c ${whereClause}`,
+    params,
+  );
+
+  const cronjobs = await queryAll<Cronjob & { user_email?: string; user_name?: string }>(
+    `SELECT c.*, u.email as user_email, u.name as user_name
+     FROM cronjobs c
+     LEFT JOIN users u ON c.customer_id = u.id
+     ${whereClause}
+     ORDER BY c.created_at DESC
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset],
+  );
+
+  return {
+    cronjobs,
+    total: parseInt(countResult?.count ?? "0", 10),
+  };
+}
+
 export default {
   // Cronjob
   createCronjob,
@@ -380,6 +438,7 @@ export default {
   deleteCronjob,
   listCronjobsByBox,
   listCronjobsByCustomer,
+  listAllCronjobs,
   getDueCronjobs,
   toggleCronjob,
   // Execution

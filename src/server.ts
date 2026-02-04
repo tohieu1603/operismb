@@ -5,11 +5,14 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import swaggerUi from "swagger-ui-express";
 import { operisRouter } from "./index.js";
 import { allowHostsMiddleware } from "./middleware/allow-hosts.middleware.js";
 import { getPool, runMigrations } from "./db/connection.js";
 import openaiCompatRoutes from "./routes/openai-compat.routes.js";
 import anthropicCompatRoutes from "./routes/anthropic-compat.routes.js";
+import { cronService } from "./services/cron.service.js";
+import { swaggerSpec } from "./config/swagger.config.js";
 
 const PORT = parseInt(process.env.PORT || "3025", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -59,6 +62,9 @@ async function main() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Swagger docs
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
   // API routes
   app.use("/api", operisRouter);
 
@@ -70,6 +76,9 @@ async function main() {
 
   app.listen(PORT, HOST, () => {
     console.log(`[server] Operis API running at http://${HOST}:${PORT}`);
+
+    // Start cron scheduler
+    cronService.startScheduler();
   });
 }
 
