@@ -159,11 +159,11 @@ interface ToolUseBlock {
 
 type ContentBlock = TextBlock | ToolUseBlock;
 
+// Exactly as Moltbot gateway returns
 interface TokenUsage {
-  input_tokens: number;
-  output_tokens: number;
-  cache_read_input_tokens?: number;
-  cache_creation_input_tokens?: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
 }
 
 interface ChatMessage {
@@ -238,6 +238,7 @@ class ChatService {
       {
         tools: options?.tools,
         systemPrompt: options?.systemPrompt,
+        sessionKey: `${userId}-${convId}`, // Unique session per user + conversation
       },
     );
 
@@ -254,12 +255,12 @@ class ChatService {
       content: textContent,
       model: aiResponse.model,
       provider: "anthropic",
-      tokens_used: aiResponse.usage.input_tokens + aiResponse.usage.output_tokens,
+      tokens_used: aiResponse.usage.total_tokens,
       cost: aiResponse.cost.total,
     });
 
     // Deduct tokens
-    const tokensToDeduct = aiResponse.usage.input_tokens + aiResponse.usage.output_tokens;
+    const tokensToDeduct = aiResponse.usage.total_tokens;
     if (tokensToDeduct > 0 && user.token_balance < tokensToDeduct) {
       throw Errors.insufficientBalance(user.token_balance, tokensToDeduct);
     }
@@ -273,8 +274,8 @@ class ChatService {
         request_type: "chat",
         request_id: convId,
         model: aiResponse.model,
-        input_tokens: aiResponse.usage.input_tokens,
-        output_tokens: aiResponse.usage.output_tokens,
+        input_tokens: aiResponse.usage.prompt_tokens,
+        output_tokens: aiResponse.usage.completion_tokens,
         total_tokens: tokensToDeduct,
         cost_tokens: tokensToDeduct,
         metadata: {
@@ -299,7 +300,7 @@ class ChatService {
     gatewayUrl: string,
     gatewayToken: string,
     messages: ChatMessage[],
-    options?: { tools?: unknown[]; systemPrompt?: string },
+    options?: { tools?: unknown[]; systemPrompt?: string; sessionKey?: string },
   ): Promise<Omit<ChatResult, "conversationId" | "tokenBalance">> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
@@ -358,6 +359,7 @@ class ChatService {
           model: DEFAULT_MODEL,
           messages: apiMessages,
           max_tokens: MAX_TOKENS,
+          user: options?.sessionKey, // Gateway session key
           ...(apiTools ? { tools: apiTools } : {}),
         }),
         signal: controller.signal,
@@ -404,19 +406,13 @@ class ChatService {
         }
       }
 
-      // Calculate usage and cost
-      // If gateway doesn't return usage, estimate from text (~4 chars per token)
-      const estimateTokens = (text: string) => Math.ceil(text.length / 4);
-      const inputText = apiMessages.map(m => m.content).join(" ");
-      const outputText = responseMessage?.content || "";
-
-      const inputTokens = data.usage?.prompt_tokens || estimateTokens(inputText);
-      const outputTokens = data.usage?.completion_tokens || estimateTokens(outputText);
+      // Use usage directly from gateway - no modification
+      const usage = data.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
       const model = data.model || DEFAULT_MODEL;
       const pricing = PRICING[model as keyof typeof PRICING] || PRICING["claude-sonnet-4-20250514"];
 
-      const inputCost = (inputTokens / 1_000_000) * pricing.input;
-      const outputCost = (outputTokens / 1_000_000) * pricing.output;
+      const inputCost = (usage.prompt_tokens / 1_000_000) * pricing.input;
+      const outputCost = (usage.completion_tokens / 1_000_000) * pricing.output;
 
       // Determine stop reason
       let stopReason: ChatResult["stop_reason"] = "end_turn";
@@ -433,10 +429,7 @@ class ChatService {
         content,
         model,
         stop_reason: stopReason,
-        usage: {
-          input_tokens: inputTokens,
-          output_tokens: outputTokens,
-        },
+        usage,
         cost: {
           input: inputCost,
           output: outputCost,

@@ -19,6 +19,7 @@ import type {
 // Config
 const SCHEDULER_INTERVAL_MS = 60_000; // Check every minute
 const EXECUTION_TIMEOUT_MS = 120_000; // 2 minute timeout
+const STOP_TIMEOUT_MS = 10_000; // 10 second timeout for stop command
 
 // Scheduler state
 let schedulerTimer: NodeJS.Timeout | null = null;
@@ -49,6 +50,68 @@ function isValidCronSchedule(schedule: string): boolean {
 }
 
 // ============================================================================
+// Stop Agent - Send /stop to Moltbot gateway to abort running agent
+// ============================================================================
+
+/**
+ * Send /stop command to Moltbot gateway to abort any running agent for this cronjob
+ * Uses the same sessionKey as executeCronjob: `cron:{cronjobId}`
+ */
+async function stopCronjobAgent(cronjob: Cronjob): Promise<{ stopped: boolean; error?: string }> {
+  try {
+    const user = await usersRepo.getUserById(cronjob.customer_id);
+    if (!user?.gateway_url) {
+      return { stopped: false, error: "Gateway URL not configured" };
+    }
+
+    const hooksToken = user.gateway_hooks_token || user.gateway_token;
+    if (!hooksToken) {
+      return { stopped: false, error: "Gateway token not configured" };
+    }
+
+    const sessionKey = `cron:${cronjob.id}`;
+    console.log(`[Cron] Sending /stop to sessionKey: ${sessionKey}`);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), STOP_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${user.gateway_url}/hooks/wake`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${hooksToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "/stop",
+          sessionKey,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`[Cron] Stop command failed: ${response.status} - ${errorText}`);
+        return { stopped: false, error: `${response.status} - ${errorText}` };
+      }
+
+      console.log(`[Cron] Stop command sent successfully for ${cronjob.name}`);
+      return { stopped: true };
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      const errorMsg = fetchError instanceof Error ? fetchError.message : "Unknown error";
+      console.warn(`[Cron] Stop command error: ${errorMsg}`);
+      return { stopped: false, error: errorMsg };
+    }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    return { stopped: false, error: errorMsg };
+  }
+}
+
+// ============================================================================
 // CRUD Operations
 // ============================================================================
 
@@ -59,13 +122,21 @@ async function createCronjob(
   userId: string,
   data: Omit<CronjobCreate, "customer_id">,
 ): Promise<Cronjob> {
-  // Validate schedule
-  if (!isValidCronSchedule(data.schedule)) {
+  // Validate schedule for cron type
+  const scheduleType = data.schedule_type || "cron";
+  if (scheduleType === "cron" && !isValidCronSchedule(data.schedule_expr)) {
     throw Errors.badRequest("Invalid cron schedule format");
   }
 
-  // Calculate next run time
-  const nextRunAt = calculateNextRun(data.schedule);
+  // Calculate next run time based on schedule type
+  let nextRunAt: Date | null = null;
+  if (scheduleType === "cron") {
+    nextRunAt = calculateNextRun(data.schedule_expr);
+  } else if (scheduleType === "every" && data.schedule_interval_ms) {
+    nextRunAt = new Date(Date.now() + data.schedule_interval_ms);
+  } else if (scheduleType === "at" && data.schedule_at_ms) {
+    nextRunAt = new Date(data.schedule_at_ms);
+  }
 
   const cronjob = await cronjobsRepo.createCronjob({
     ...data,
@@ -99,15 +170,27 @@ async function updateCronjob(
   data: CronjobUpdate,
 ): Promise<Cronjob> {
   // Check ownership
-  await getCronjob(userId, cronjobId);
+  const existingJob = await getCronjob(userId, cronjobId);
 
   // If schedule changed, recalculate next run
   let nextRunAt: Date | null | undefined;
-  if (data.schedule) {
-    if (!isValidCronSchedule(data.schedule)) {
+  const scheduleType = data.schedule_type || existingJob.schedule_type || "cron";
+
+  if (data.schedule_expr) {
+    if (scheduleType === "cron" && !isValidCronSchedule(data.schedule_expr)) {
       throw Errors.badRequest("Invalid cron schedule format");
     }
-    nextRunAt = calculateNextRun(data.schedule);
+    if (scheduleType === "cron") {
+      nextRunAt = calculateNextRun(data.schedule_expr);
+    }
+  }
+
+  if (scheduleType === "every" && data.schedule_interval_ms) {
+    nextRunAt = new Date(Date.now() + data.schedule_interval_ms);
+  }
+
+  if (scheduleType === "at" && data.schedule_at_ms) {
+    nextRunAt = new Date(data.schedule_at_ms);
   }
 
   // If disabling job, clear next_run_at
@@ -129,10 +212,15 @@ async function updateCronjob(
 
 /**
  * Delete cronjob
+ * Always sends /stop to Moltbot gateway to abort any running agent
  */
 async function deleteCronjob(userId: string, cronjobId: string): Promise<void> {
   // Check ownership
-  await getCronjob(userId, cronjobId);
+  const cronjob = await getCronjob(userId, cronjobId);
+
+  // Always send stop command to abort any running agent before deleting
+  // (even if disabled, there could still be a running agent from previous execution)
+  await stopCronjobAgent(cronjob);
 
   const deleted = await cronjobsRepo.deleteCronjob(cronjobId);
   if (!deleted) {
@@ -172,6 +260,7 @@ async function listAllCronjobs(options?: {
 
 /**
  * Toggle cronjob enabled status
+ * When disabling, also sends /stop to Moltbot gateway to abort any running agent
  */
 async function toggleCronjob(
   userId: string,
@@ -179,7 +268,12 @@ async function toggleCronjob(
   enabled: boolean,
 ): Promise<Cronjob> {
   // Check ownership
-  await getCronjob(userId, cronjobId);
+  const cronjob = await getCronjob(userId, cronjobId);
+
+  // If disabling, send stop command to abort any running agent
+  if (!enabled && cronjob.enabled) {
+    await stopCronjobAgent(cronjob);
+  }
 
   const updated = await cronjobsRepo.toggleCronjob(cronjobId, enabled);
   if (!updated) {
@@ -204,15 +298,21 @@ async function getExecutions(
 }
 
 // ============================================================================
-// Runner - Execute cronjob by calling user's gateway
+// Runner - Execute cronjob by calling user's gateway /hooks/agent
 // ============================================================================
 
 /**
- * Execute a single cronjob
+ * Execute a single cronjob via Moltbot gateway
+ * - systemEvent: sends to /hooks/wake (main session system event)
+ * - agentTurn: sends to /hooks/agent (isolated agent run)
+ * Uses all Moltbot features: wakeMode, sessionKey, channel, deliver, etc.
  */
 async function executeCronjob(cronjob: Cronjob): Promise<CronjobExecution> {
-  // Start execution record
+  const startTime = Date.now();
+
+  // Start execution record and mark job as running
   const execution = await cronjobsRepo.startCronjobRun(cronjob.id);
+  await cronjobsRepo.updateCronjob(cronjob.id, { running_at: new Date() });
 
   try {
     // Get user's gateway config
@@ -221,29 +321,72 @@ async function executeCronjob(cronjob: Cronjob): Promise<CronjobExecution> {
       throw new Error("User not found");
     }
 
-    if (!user.gateway_url || !user.gateway_token) {
-      throw new Error("Gateway not configured for user");
+    if (!user.gateway_url) {
+      throw new Error("Gateway URL not configured for user");
     }
 
-    // Build the message to send to gateway
-    const message = cronjob.task || cronjob.action;
+    // Use gateway_hooks_token if available, fallback to gateway_token
+    const hooksToken = user.gateway_hooks_token || user.gateway_token;
+    if (!hooksToken) {
+      throw new Error("Gateway hooks token not configured for user");
+    }
 
-    // Call gateway's chat endpoint
+    const sessionKey = `cron:${cronjob.id}`;
+    const payloadKind = cronjob.payload_kind || "agentTurn";
+
+    // Determine endpoint and build payload based on payload_kind
+    let endpoint: string;
+    let hookPayload: Record<string, unknown>;
+
+    if (payloadKind === "systemEvent") {
+      // systemEvent: use /hooks/wake for main session
+      endpoint = `${user.gateway_url}/hooks/wake`;
+      hookPayload = {
+        text: cronjob.message,
+        sessionKey,
+        wakeMode: cronjob.wake_mode,
+      };
+    } else {
+      // agentTurn: use /hooks/agent for isolated agent run
+      endpoint = `${user.gateway_url}/hooks/agent`;
+      hookPayload = {
+        message: cronjob.message,
+        name: cronjob.name,
+        wakeMode: cronjob.wake_mode,
+        sessionKey,
+        ...(cronjob.agent_id && cronjob.agent_id !== "main" && { agentId: cronjob.agent_id }),
+        ...(cronjob.model && { model: cronjob.model }),
+        ...(cronjob.thinking && { thinking: cronjob.thinking }),
+        ...(cronjob.timeout_seconds && { timeoutSeconds: cronjob.timeout_seconds }),
+        ...(cronjob.allow_unsafe_external_content && { allowUnsafeExternalContent: true }),
+        ...(cronjob.deliver !== undefined && { deliver: cronjob.deliver }),
+        ...(cronjob.channel && { channel: cronjob.channel }),
+        ...(cronjob.to_recipient && { to: cronjob.to_recipient }),
+        ...(cronjob.best_effort_deliver && { bestEffortDeliver: true }),
+        // Isolation config for isolated sessions
+        ...(cronjob.session_target === "isolated" && {
+          ...(cronjob.isolation_post_to_main_prefix && { postToMainPrefix: cronjob.isolation_post_to_main_prefix }),
+          ...(cronjob.isolation_post_to_main_mode && { postToMainMode: cronjob.isolation_post_to_main_mode }),
+          ...(cronjob.isolation_post_to_main_max_chars && { postToMainMaxChars: cronjob.isolation_post_to_main_max_chars }),
+        }),
+      };
+    }
+
+    console.log(`[Cron] Executing job ${cronjob.name} via ${payloadKind === "systemEvent" ? "/hooks/wake" : "/hooks/agent"}`);
+    console.log(`[Cron] Payload:`, JSON.stringify(hookPayload, null, 2));
+
+    // Call gateway endpoint
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), EXECUTION_TIMEOUT_MS);
 
     try {
-      const response = await fetch(`${user.gateway_url}/v1/chat/completions`, {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${user.gateway_token}`,
+          Authorization: `Bearer ${hooksToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          messages: [{ role: "user", content: message }],
-          stream: false,
-        }),
+        body: JSON.stringify(hookPayload),
         signal: controller.signal,
       });
 
@@ -251,35 +394,25 @@ async function executeCronjob(cronjob: Cronjob): Promise<CronjobExecution> {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Gateway error: ${response.status} - ${errorText}`);
+        throw new Error(`Gateway hooks error: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
-      const output = result.choices?.[0]?.message?.content || JSON.stringify(result);
 
-      // Extract token usage from response
-      const usage = result.usage || {};
-      const inputTokens = usage.prompt_tokens || 0;
-      const outputTokens = usage.completion_tokens || 0;
-      const totalTokens = usage.total_tokens || inputTokens + outputTokens;
+      // Build output message based on response
+      const output = result.ok
+        ? result.runId
+          ? `Queued with runId: ${result.runId}`
+          : "Executed successfully"
+        : JSON.stringify(result);
 
-      // Record token usage for analytics
-      if (totalTokens > 0) {
-        await analyticsService.recordUsage({
-          user_id: cronjob.customer_id,
-          request_type: "cronjob",
-          request_id: cronjob.id,
-          model: result.model || "claude-sonnet-4-20250514",
-          input_tokens: inputTokens,
-          output_tokens: outputTokens,
-          total_tokens: totalTokens,
-          cost_tokens: totalTokens,
-          metadata: {
-            cronjob_name: cronjob.name,
-            execution_id: execution.id,
-          },
-        });
+      if (result.runId) {
+        console.log(`[Cron] Job ${cronjob.name} queued: runId=${result.runId}`);
+      } else {
+        console.log(`[Cron] Job ${cronjob.name} executed successfully`);
       }
+
+      const durationMs = Date.now() - startTime;
 
       // Mark execution as success
       const completed = await cronjobsRepo.completeExecution(execution.id, {
@@ -287,10 +420,20 @@ async function executeCronjob(cronjob: Cronjob): Promise<CronjobExecution> {
         output,
       });
 
-      // Update next run time
-      const nextRun = calculateNextRun(cronjob.schedule);
-      if (nextRun) {
-        await cronjobsRepo.updateCronjob(cronjob.id, { next_run_at: nextRun });
+      // Update job state
+      const nextRun = calculateNextRunForJob(cronjob);
+      await cronjobsRepo.updateCronjob(cronjob.id, {
+        running_at: null,
+        last_status: "ok",
+        last_error: undefined,
+        last_duration_ms: durationMs,
+        next_run_at: nextRun,
+      });
+
+      // Handle delete_after_run
+      if (cronjob.delete_after_run) {
+        await cronjobsRepo.deleteCronjob(cronjob.id);
+        console.log(`[Cron] Job ${cronjob.name} deleted after run`);
       }
 
       return completed!;
@@ -299,20 +442,53 @@ async function executeCronjob(cronjob: Cronjob): Promise<CronjobExecution> {
       throw fetchError;
     }
   } catch (error) {
+    const durationMs = Date.now() - startTime;
+
     // Mark execution as failure
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`[Cron] Job ${cronjob.name} failed:`, errorMessage);
+
     const completed = await cronjobsRepo.completeExecution(execution.id, {
       status: "failure",
       error: errorMessage,
     });
 
-    // Still update next run time even on failure
-    const nextRun = calculateNextRun(cronjob.schedule);
-    if (nextRun) {
-      await cronjobsRepo.updateCronjob(cronjob.id, { next_run_at: nextRun });
-    }
+    // Update job state with error
+    const nextRun = calculateNextRunForJob(cronjob);
+    await cronjobsRepo.updateCronjob(cronjob.id, {
+      running_at: null,
+      last_status: "error",
+      last_error: errorMessage,
+      last_duration_ms: durationMs,
+      next_run_at: nextRun,
+    });
 
     return completed!;
+  }
+}
+
+/**
+ * Calculate next run time based on schedule type
+ */
+function calculateNextRunForJob(cronjob: Cronjob): Date | null {
+  const scheduleType = cronjob.schedule_type || "cron";
+
+  switch (scheduleType) {
+    case "cron":
+      return calculateNextRun(cronjob.schedule_expr);
+
+    case "every":
+      if (cronjob.schedule_interval_ms) {
+        return new Date(Date.now() + cronjob.schedule_interval_ms);
+      }
+      return null;
+
+    case "at":
+      // "at" type runs only once, no next run
+      return null;
+
+    default:
+      return calculateNextRun(cronjob.schedule_expr);
   }
 }
 
@@ -406,6 +582,7 @@ export const cronService = {
   // Runner
   runCronjobNow,
   executeCronjob,
+  stopCronjobAgent,
   // Scheduler
   startScheduler,
   stopScheduler,

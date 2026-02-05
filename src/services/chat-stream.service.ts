@@ -28,6 +28,32 @@ interface StreamOptions {
   conversationId?: string;
 }
 
+const MAX_HISTORY_MESSAGES = 20;
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/**
+ * Load conversation history from DB
+ */
+async function loadConversationHistory(
+  userId: string,
+  conversationId: string,
+): Promise<ChatMessage[]> {
+  const messages = await chatMessagesRepo.getConversationHistory(
+    userId,
+    conversationId,
+    MAX_HISTORY_MESSAGES,
+  );
+
+  return messages.map((msg) => ({
+    role: msg.role as "user" | "assistant",
+    content: msg.content,
+  }));
+}
+
 /**
  * Estimate tokens from text (~4 chars per token)
  */
@@ -74,6 +100,9 @@ async function streamMessage(
 
   const convId = options?.conversationId || generateConversationId();
 
+  // Load conversation history
+  const history = await loadConversationHistory(userId, convId);
+
   // Save user message to history
   await chatMessagesRepo.createMessage({
     user_id: userId,
@@ -81,6 +110,9 @@ async function streamMessage(
     role: "user",
     content: message,
   });
+
+  // Build messages with history + new message
+  const messages: ChatMessage[] = [...history, { role: "user", content: message }];
 
   // Setup SSE headers (Cloudflare + Nginx compatible)
   res.setHeader("Content-Type", "text/event-stream");
@@ -102,6 +134,7 @@ async function streamMessage(
   let fullContent = "";
   let inputTokens = 0;
   let outputTokens = 0;
+  let totalTokens = 0;
 
   try {
     // Call gateway with stream:true
@@ -113,8 +146,9 @@ async function streamMessage(
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
-        messages: [{ role: "user", content: message }],
+        messages, // History + current message
         stream: true,
+        user: `${userId}-${convId}`, // Unique session per user + conversation
       }),
       signal: controller.signal,
     });
@@ -157,10 +191,11 @@ async function streamMessage(
               sendSSE(res, "content", { delta, content: fullContent });
             }
 
-            // Capture usage if available
+            // Capture usage if available (use gateway values directly)
             if (chunk.usage) {
               inputTokens = chunk.usage.prompt_tokens || 0;
               outputTokens = chunk.usage.completion_tokens || 0;
+              totalTokens = chunk.usage.total_tokens || 0;
             }
           } catch {
             // Skip invalid JSON
@@ -169,11 +204,10 @@ async function streamMessage(
       }
     }
 
-    // Estimate tokens if not provided
+    // Estimate tokens if not provided by gateway
     if (inputTokens === 0) inputTokens = estimateTokens(message);
     if (outputTokens === 0) outputTokens = estimateTokens(fullContent);
-
-    const totalTokens = inputTokens + outputTokens;
+    if (totalTokens === 0) totalTokens = inputTokens + outputTokens;
 
     // Calculate cost
     const pricing = PRICING[DEFAULT_MODEL] || PRICING["claude-sonnet-4-20250514"];

@@ -154,18 +154,56 @@ export interface AgentUpdate {
 }
 
 // ============================================================================
-// Cronjob Types
+// Cronjob Types (Moltbot-compatible)
 // ============================================================================
+
+// Schedule types matching Moltbot gateway
+export type CronScheduleType = "cron" | "every" | "at";
+export type CronSessionTarget = "main" | "isolated";
+export type CronWakeMode = "next-heartbeat" | "now";
+export type CronPayloadKind = "systemEvent" | "agentTurn";
+export type CronIsolationPostMode = "summary" | "full";
+
 export interface Cronjob {
   id: string;
   box_id: string;
   customer_id: string;
+  agent_id: string; // which agent to use (default: "main")
   name: string;
-  schedule: string;
-  action: string;
-  task: string | null;
+  description: string | null;
+  // Schedule config
+  schedule_type: CronScheduleType;
+  schedule_expr: string; // cron expression or description
+  schedule_tz: string | null; // timezone for cron
+  schedule_interval_ms: number | null; // for "every" type
+  schedule_at_ms: number | null; // for "at" type (timestamp)
+  schedule_anchor_ms: number | null; // anchor for "every" schedule
+  // Execution config
+  session_target: CronSessionTarget;
+  wake_mode: CronWakeMode;
+  // Payload config (what to send to gateway)
+  payload_kind: CronPayloadKind; // systemEvent or agentTurn
+  message: string; // agent message or system event text
+  model: string | null;
+  thinking: string | null;
+  timeout_seconds: number | null;
+  allow_unsafe_external_content: boolean;
+  deliver: boolean;
+  channel: string | null; // "last" or channel ID
+  to_recipient: string | null;
+  best_effort_deliver: boolean;
+  // Isolation config (for isolated sessions)
+  isolation_post_to_main_prefix: string | null;
+  isolation_post_to_main_mode: CronIsolationPostMode | null;
+  isolation_post_to_main_max_chars: number | null;
+  // State
   enabled: boolean;
+  delete_after_run: boolean;
+  running_at: Date | null; // when job started running
   last_run_at: Date | null;
+  last_status: "ok" | "error" | "skipped" | null;
+  last_error: string | null;
+  last_duration_ms: number | null;
   next_run_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -173,24 +211,80 @@ export interface Cronjob {
 }
 
 export interface CronjobCreate {
-  box_id: string;
+  box_id?: string;
   customer_id: string;
+  agent_id?: string;
   name: string;
-  schedule: string;
-  action: string;
-  task?: string;
+  description?: string;
+  // Schedule
+  schedule_type?: CronScheduleType;
+  schedule_expr: string;
+  schedule_tz?: string;
+  schedule_interval_ms?: number;
+  schedule_at_ms?: number;
+  schedule_anchor_ms?: number;
+  // Execution
+  session_target?: CronSessionTarget;
+  wake_mode?: CronWakeMode;
+  // Payload
+  payload_kind?: CronPayloadKind;
+  message: string;
+  model?: string;
+  thinking?: string;
+  timeout_seconds?: number;
+  allow_unsafe_external_content?: boolean;
+  deliver?: boolean;
+  channel?: string;
+  to_recipient?: string;
+  best_effort_deliver?: boolean;
+  // Isolation config
+  isolation_post_to_main_prefix?: string;
+  isolation_post_to_main_mode?: CronIsolationPostMode;
+  isolation_post_to_main_max_chars?: number;
+  // State
   enabled?: boolean;
+  delete_after_run?: boolean;
   next_run_at?: Date;
   metadata?: Record<string, unknown>;
 }
 
 export interface CronjobUpdate {
+  agent_id?: string;
   name?: string;
-  schedule?: string;
-  action?: string;
-  task?: string;
+  description?: string;
+  // Schedule
+  schedule_type?: CronScheduleType;
+  schedule_expr?: string;
+  schedule_tz?: string;
+  schedule_interval_ms?: number;
+  schedule_at_ms?: number;
+  schedule_anchor_ms?: number;
+  // Execution
+  session_target?: CronSessionTarget;
+  wake_mode?: CronWakeMode;
+  // Payload
+  payload_kind?: CronPayloadKind;
+  message?: string;
+  model?: string;
+  thinking?: string;
+  timeout_seconds?: number;
+  allow_unsafe_external_content?: boolean;
+  deliver?: boolean;
+  channel?: string;
+  to_recipient?: string;
+  best_effort_deliver?: boolean;
+  // Isolation config
+  isolation_post_to_main_prefix?: string;
+  isolation_post_to_main_mode?: CronIsolationPostMode;
+  isolation_post_to_main_max_chars?: number;
+  // State
   enabled?: boolean;
+  delete_after_run?: boolean;
+  running_at?: Date | null;
   last_run_at?: Date;
+  last_status?: "ok" | "error" | "skipped" | null;
+  last_error?: string;
+  last_duration_ms?: number;
   next_run_at?: Date | null;
   metadata?: Record<string, unknown>;
 }

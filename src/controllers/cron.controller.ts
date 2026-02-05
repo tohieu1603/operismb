@@ -40,19 +40,69 @@ class CronController {
   }
 
   /**
-   * Create new cronjob
+   * Create new cronjob (Moltbot-compatible)
    * POST /cron
    */
   async create(req: Request, res: Response): Promise<void> {
-    const { box_id, name, schedule, action, task, enabled, metadata } = req.body;
+    const {
+      box_id,
+      agent_id,
+      name,
+      description,
+      schedule_type,
+      schedule_expr,
+      schedule_tz,
+      schedule_interval_ms,
+      schedule_at_ms,
+      schedule_anchor_ms,
+      session_target,
+      wake_mode,
+      payload_kind,
+      message,
+      model,
+      thinking,
+      timeout_seconds,
+      allow_unsafe_external_content,
+      deliver,
+      channel,
+      to_recipient,
+      best_effort_deliver,
+      isolation_post_to_main_prefix,
+      isolation_post_to_main_mode,
+      isolation_post_to_main_max_chars,
+      enabled,
+      delete_after_run,
+      metadata,
+    } = req.body;
 
     const cronjob = await cronService.createCronjob(req.user!.userId, {
       box_id,
+      agent_id,
       name,
-      schedule,
-      action,
-      task,
+      description,
+      schedule_type,
+      schedule_expr,
+      schedule_tz,
+      schedule_interval_ms,
+      schedule_at_ms,
+      schedule_anchor_ms,
+      session_target,
+      wake_mode,
+      payload_kind,
+      message,
+      model,
+      thinking,
+      timeout_seconds,
+      allow_unsafe_external_content,
+      deliver,
+      channel,
+      to_recipient,
+      best_effort_deliver,
+      isolation_post_to_main_prefix,
+      isolation_post_to_main_mode,
+      isolation_post_to_main_max_chars,
       enabled,
+      delete_after_run,
       metadata,
     });
 
@@ -60,18 +110,67 @@ class CronController {
   }
 
   /**
-   * Update cronjob
+   * Update cronjob (Moltbot-compatible)
    * PATCH /cron/:id
    */
   async update(req: Request, res: Response): Promise<void> {
-    const { name, schedule, action, task, enabled, metadata } = req.body;
+    const {
+      agent_id,
+      name,
+      description,
+      schedule_type,
+      schedule_expr,
+      schedule_tz,
+      schedule_interval_ms,
+      schedule_at_ms,
+      schedule_anchor_ms,
+      session_target,
+      wake_mode,
+      payload_kind,
+      message,
+      model,
+      thinking,
+      timeout_seconds,
+      allow_unsafe_external_content,
+      deliver,
+      channel,
+      to_recipient,
+      best_effort_deliver,
+      isolation_post_to_main_prefix,
+      isolation_post_to_main_mode,
+      isolation_post_to_main_max_chars,
+      enabled,
+      delete_after_run,
+      metadata,
+    } = req.body;
 
     const cronjob = await cronService.updateCronjob(req.user!.userId, req.params.id, {
+      agent_id,
       name,
-      schedule,
-      action,
-      task,
+      description,
+      schedule_type,
+      schedule_expr,
+      schedule_tz,
+      schedule_interval_ms,
+      schedule_at_ms,
+      schedule_anchor_ms,
+      session_target,
+      wake_mode,
+      payload_kind,
+      message,
+      model,
+      thinking,
+      timeout_seconds,
+      allow_unsafe_external_content,
+      deliver,
+      channel,
+      to_recipient,
+      best_effort_deliver,
+      isolation_post_to_main_prefix,
+      isolation_post_to_main_mode,
+      isolation_post_to_main_max_chars,
       enabled,
+      delete_after_run,
       metadata,
     });
 

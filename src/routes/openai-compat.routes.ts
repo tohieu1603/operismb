@@ -170,8 +170,8 @@ router.post("/chat/completions", async (req: Request, res: Response) => {
     // Use tool_calls if we have them and tools were requested
     const shouldUseToolCalls = hasToolCalls && hasTools;
 
-    // Calculate total tokens
-    const totalTokens = result.usage.input_tokens + result.usage.output_tokens;
+    // Use total tokens from gateway directly
+    const totalTokens = result.usage.total_tokens;
 
     // Handle tool_calls - respect streaming preference
     if (shouldUseToolCalls) {
@@ -263,8 +263,8 @@ router.post("/chat/completions", async (req: Request, res: Response) => {
         model: result.model,
         choices: [{ index: 0, message, finish_reason: "tool_calls" }],
         usage: {
-          prompt_tokens: result.usage.input_tokens,
-          completion_tokens: result.usage.output_tokens,
+          prompt_tokens: result.usage.prompt_tokens,
+          completion_tokens: result.usage.completion_tokens,
           total_tokens: totalTokens,
         },
       });
@@ -326,8 +326,8 @@ router.post("/chat/completions", async (req: Request, res: Response) => {
           model: result.model,
           choices: [],
           usage: {
-            prompt_tokens: result.usage.input_tokens,
-            completion_tokens: result.usage.output_tokens,
+            prompt_tokens: result.usage.prompt_tokens,
+            completion_tokens: result.usage.completion_tokens,
             total_tokens: totalTokens,
           },
         };
@@ -364,8 +364,8 @@ router.post("/chat/completions", async (req: Request, res: Response) => {
           },
         ],
         usage: {
-          prompt_tokens: result.usage.input_tokens,
-          completion_tokens: result.usage.output_tokens,
+          prompt_tokens: result.usage.prompt_tokens,
+          completion_tokens: result.usage.completion_tokens,
           total_tokens: totalTokens,
         },
       };
