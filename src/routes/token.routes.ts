@@ -186,6 +186,66 @@ router.get(
 );
 
 // =============================================================================
+// USAGE DEDUCTION - Trừ token sau khi dùng AI
+// =============================================================================
+
+/**
+ * @swagger
+ * /tokens/usage:
+ *   post:
+ *     tags: [Tokens]
+ *     summary: Trừ token sau khi dùng AI
+ *     description: |
+ *       Client gọi sau mỗi chat để trừ token đã dùng.
+ *       Ghi log usage analytics + trừ balance.
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [prompt_tokens, completion_tokens, total_tokens]
+ *             properties:
+ *               prompt_tokens:
+ *                 type: integer
+ *               completion_tokens:
+ *                 type: integer
+ *               total_tokens:
+ *                 type: integer
+ *               model:
+ *                 type: string
+ *               request_type:
+ *                 type: string
+ *                 enum: [chat, cronjob, api]
+ *               request_id:
+ *                 type: string
+ *               metadata:
+ *                 type: object
+ *           example:
+ *             prompt_tokens: 39909
+ *             completion_tokens: 61
+ *             total_tokens: 39970
+ *             model: "claude-sonnet-4-5-20250929"
+ *
+ *     responses:
+ *       200:
+ *         description: Token deducted
+ *         content:
+ *           application/json:
+ *             example:
+ *               balance: 9960030
+ *               deducted: 39970
+ *               usage_id: "uuid"
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post(
+  "/usage",
+  asyncHandler((req, res) => tokenController.deductUsage(req, res)),
+);
+
+// =============================================================================
 // ADMIN ROUTES - Quản lý token cho users
 // =============================================================================
 

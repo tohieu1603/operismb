@@ -2,10 +2,11 @@
  * Token Service - Token balance and transactions
  */
 
-import { usersRepo, tokenTransactionsRepo } from "../db/index.js";
+import { usersRepo, tokenTransactionsRepo, tokenUsageRepo } from "../db/index.js";
 import { Errors } from "../core/errors/api-error.js";
 import { sanitizeUser } from "../utils/sanitize.util.js";
 import type { SafeUser, TokenTransaction } from "../core/types/entities.js";
+import type { RequestType } from "../db/models/types.js";
 
 export interface TransactionResult {
   user: SafeUser;
@@ -92,6 +93,60 @@ class TokenService {
   async adjust(userId: string, amount: number, description: string): Promise<TransactionResult> {
     const result = await tokenTransactionsRepo.adjustTokens(userId, amount, description);
     return { user: sanitizeUser(result.user), transaction: result.transaction };
+  }
+
+  /**
+   * Deduct tokens after AI usage: record usage analytics + debit from balance
+   */
+  async deductUsage(
+    userId: string,
+    usage: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+      model?: string;
+      request_type?: RequestType;
+      request_id?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<{ balance: number; deducted: number; usage_id: string }> {
+    const costTokens = usage.total_tokens;
+    if (costTokens <= 0) {
+      throw Errors.badRequest("total_tokens must be greater than 0");
+    }
+
+    const user = await usersRepo.getUserById(userId);
+    if (!user) throw Errors.notFound("User");
+    if (user.token_balance < costTokens) {
+      throw Errors.insufficientBalance(user.token_balance, costTokens);
+    }
+
+    // 1) Record usage analytics
+    const usageRecord = await tokenUsageRepo.recordUsage({
+      user_id: userId,
+      request_type: usage.request_type ?? "chat",
+      request_id: usage.request_id,
+      model: usage.model,
+      input_tokens: usage.prompt_tokens,
+      output_tokens: usage.completion_tokens,
+      total_tokens: usage.total_tokens,
+      cost_tokens: costTokens,
+      metadata: usage.metadata,
+    });
+
+    // 2) Debit from balance + create transaction
+    const result = await tokenTransactionsRepo.debitTokens(
+      userId,
+      costTokens,
+      `AI usage: ${usage.prompt_tokens} in + ${usage.completion_tokens} out = ${usage.total_tokens} tokens`,
+      usageRecord.id,
+    );
+
+    return {
+      balance: result.user.token_balance,
+      deducted: costTokens,
+      usage_id: usageRecord.id,
+    };
   }
 
   async getAllTransactions(
