@@ -55,18 +55,23 @@ class ChatMessagesRepo {
 
   /**
    * Get conversation history for a user
-   * Returns messages in chronological order
+   * Returns the N most recent messages in chronological order
+   * (fetch newest first, then reverse to maintain timeline order)
    */
   async getConversationHistory(
     userId: string,
     conversationId: string,
     limit: number = 50,
   ): Promise<ChatMessage[]> {
+    // Subquery: get N newest messages, then order by ASC for correct timeline
     return queryAll<ChatMessage>(
-      `SELECT * FROM chat_messages 
-       WHERE user_id = $1 AND conversation_id = $2
-       ORDER BY created_at ASC
-       LIMIT $3`,
+      `SELECT * FROM (
+         SELECT * FROM chat_messages
+         WHERE user_id = $1 AND conversation_id = $2
+         ORDER BY created_at DESC
+         LIMIT $3
+       ) sub
+       ORDER BY created_at ASC`,
       [userId, conversationId, limit],
     );
   }
@@ -115,6 +120,29 @@ class ChatMessagesRepo {
        WHERE user_id = $1 AND conversation_id = $2`,
       [userId, conversationId],
     );
+  }
+
+  /**
+   * Get aggregated token usage for a conversation
+   */
+  async getConversationUsage(
+    userId: string,
+    conversationId: string,
+  ): Promise<{ total_tokens: number; total_cost: number; message_count: number }> {
+    const result = await queryOne<{ total_tokens: string; total_cost: string; message_count: string }>(
+      `SELECT
+        COALESCE(SUM(tokens_used), 0) as total_tokens,
+        COALESCE(SUM(cost::numeric), 0) as total_cost,
+        COUNT(*) as message_count
+       FROM chat_messages
+       WHERE user_id = $1 AND conversation_id = $2`,
+      [userId, conversationId],
+    );
+    return {
+      total_tokens: parseInt(result?.total_tokens || "0", 10),
+      total_cost: parseFloat(result?.total_cost || "0"),
+      message_count: parseInt(result?.message_count || "0", 10),
+    };
   }
 
   /**
