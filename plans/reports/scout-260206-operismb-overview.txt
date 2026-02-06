@@ -1,0 +1,337 @@
+# OPERIS MB PROJECT SCOUT REPORT
+Date: 2026-02-06
+Project: operismb (Full Codebase Architecture)
+
+================================================================================
+1. DIRECTORY STRUCTURE
+================================================================================
+
+ROOT LEVEL:
+  src/                    - Main Express API backend (13,533 LoC)
+  operis-admin/           - Admin dashboard (empty/WIP)
+  scripts/                - Utility scripts
+  plans/                  - Project planning/reports
+  .env.example            - Environment config template
+  package.json            - Node dependencies
+  tsconfig.json           - TypeScript config
+
+SRC/ STRUCTURE:
+  config/                 - Swagger configuration
+  controllers/            - 13 request handler files
+  core/                   - Types & error classes
+  db/                     - Database layer
+    connection.ts         - PostgreSQL pool + migrations
+    models/               - 14 repository files
+    schema/               - 9 SQL migration files
+  middleware/             - 5 Express middleware files
+  routes/                 - 13 API endpoint files
+  services/               - 13 business logic files
+  utils/                  - 3 utility files
+  validators/             - 4 input validation files
+  server.ts              - Express app setup
+  index.ts               - Router composition
+
+================================================================================
+2. DATABASE SCHEMA OVERVIEW
+================================================================================
+
+SCHEMA 002 - USER MANAGEMENT:
+  Table: users
+    - id, email (UNIQUE), password_hash, name, role (admin|user)
+    - is_active, last_active_at, token_balance (INTEGER)
+
+  Table: user_api_keys
+    - id, user_id (FK), key_hash, key_prefix, name
+    - permissions (array), is_active, expires_at
+
+SCHEMA 002 - TOKEN MANAGEMENT:
+  Table: token_transactions (Ledger)
+    - id, user_id (FK), type (credit|debit|adjustment)
+    - amount, balance_after, description, reference_id, created_at
+
+SCHEMA 007 - TOKEN USAGE ANALYTICS:
+  Table: token_usage
+    - id, user_id (FK), request_type (chat|cronjob|api)
+    - request_id, model, input_tokens, output_tokens
+    - total_tokens, cost_tokens, metadata, created_at
+
+SCHEMA 003 - DEPOSIT/PAYMENT:
+  Table: deposit_orders (SePay bank transfers)
+    - id, user_id (FK), order_code (UNIQUE)
+    - token_amount, amount_vnd, status
+    - payment_reference, paid_at, expires_at (10-minute)
+    - PRICING: 1M tokens = 500K VND (0.5 VND/token)
+
+SCHEMA 001 - ENTERPRISE FEATURES:
+  - customers: Organization accounts (plan, stripe_id)
+  - boxes: Mini-PC edge devices
+  - agents: AI agents
+  - cronjobs: Scheduled tasks
+  - commands: Command execution logs
+
+
+================================================================================
+3. TOKEN COUNTING & MANAGEMENT LOGIC
+================================================================================
+
+TOKEN SERVICE (src/services/token.service.ts):
+  getBalance(userId)                     - Current balance
+  credit(userId, amount, desc, ref)     - Add tokens
+  debit(userId, amount, desc, ref)      - Subtract tokens
+  adjust(userId, amount, description)   - Admin adjustment
+  getTransactions(userId, page, limit)  - Paginated history
+
+TOKEN USAGE RECORDING (src/db/models/token-usage.ts):
+  recordUsage(user_id, request_type, input_tokens, output_tokens)
+    - Creates token_usage entry with cost_tokens
+
+ANALYTICS QUERIES:
+  getUserStats(userId, startDate, endDate)
+  getUserStatsByType(userId, startDate, endDate)
+  getPlatformStats(startDate, endDate) - Global stats
+  getTopUsers(startDate, endDate, limit)
+
+TOKEN FLOW:
+  1. User makes request → controller validates
+  2. Service checks balance
+  3. API call to Claude/gateway
+  4. recordUsage() → token_usage entry
+  5. debit() → transaction + balance update
+  6. Response returned
+
+================================================================================
+4. ACCOUNT/USER MANAGEMENT SYSTEM
+================================================================================
+
+AUTHENTICATION ROUTES (/auth):
+  POST /auth/register          - Create account
+  POST /auth/login             - Get JWT tokens
+  POST /auth/refresh           - Refresh access token
+  POST /auth/logout            - Invalidate token
+  GET /auth/me                 - Current user info
+
+USER STRUCTURE:
+  id, email, password_hash, name, role (admin|user)
+  is_active, last_active_at, token_balance
+  Initial balance: 1,000,000 tokens
+
+JWT TOKENS:
+  Access token: 1 hour expiry
+  Refresh token: 7 days expiry
+
+ADMIN USER MANAGEMENT (/users):
+  - List users (paginated, searchable)
+  - Manual token operations (credit/debit/adjust)
+  - Deactivate/activate accounts
+  - View transaction history
+
+API KEY MANAGEMENT (/keys):
+  - Generate sk_* keys (SHA256 hashed)
+  - Set expiry dates + permissions
+  - Hybrid auth support (JWT OR API key)
+
+AUTHENTICATION MIDDLEWARE:
+  authMiddleware        - JWT only (Bearer token)
+  apiKeyMiddleware      - API key only (sk_* prefix)
+  hybridAuthMiddleware  - Either JWT or API key
+
+================================================================================
+5. API ROUTES & ENDPOINTS
+================================================================================
+
+AUTH (/auth):
+  POST   /auth/register          - Create account
+  POST   /auth/login             - Get JWT tokens
+  POST   /auth/refresh           - Refresh access token
+  GET    /auth/me                - Current user info
+
+USERS (/users):
+  GET    /users                  - List all users (admin)
+  GET    /users/{id}             - Get user details
+  PUT    /users/{id}             - Update profile
+  DELETE /users/{id}             - Delete user (admin)
+
+TOKENS (/tokens):
+  GET    /tokens/balance         - Current balance
+  GET    /tokens/transactions    - Transaction history
+  POST   /tokens/credit          - Add tokens (admin)
+  POST   /tokens/debit           - Remove tokens (admin)
+  POST   /tokens/adjust          - Adjust balance (admin)
+
+DEPOSITS (/deposits):
+  GET    /deposits/pricing       - Token pricing (public)
+  POST   /deposits               - Create order
+  GET    /deposits/{orderId}     - Get order details
+  GET    /deposits/history       - User's deposit history
+  POST   /deposits/webhook/sepay - SePay webhook (no auth)
+
+DEPOSIT FLOW:
+  1. GET /deposits/pricing → See token packages
+  2. POST /deposits → Create order, get bank details
+  3. User transfers VND via bank
+  4. SePay webhook → tokens auto-credited
+  5. GET /deposits/history → Confirm
+
+CHAT (/chat):
+  POST   /chat                   - Send message (JWT + API key)
+  POST   /chat/stream            - Streaming response
+  GET    /chat/conversations     - List conversations
+
+API KEYS (/keys):
+  GET    /keys                   - List user's API keys
+  POST   /keys                   - Create new API key
+  DELETE /keys/{id}              - Delete key
+  POST   /keys/{id}/revoke       - Disable key
+
+OTHER ROUTES:
+  Settings (/settings)           - Get/update system settings
+  Cronjobs (/cron)               - Schedule/execute/manage
+  Analytics (/analytics)         - Usage stats & reports
+  OpenAI Compat (/v1/chat/...)   - Moltbot integration
+  Anthropic Compat (/v1/...)     - Drop-in replacement
+
+================================================================================
+6. PAYMENT & DEPOSIT LOGIC
+================================================================================
+
+DEPOSIT SERVICE (src/services/deposit.service.ts):
+
+createDeposit(userId, tokenAmount):
+  - Validate: minimum 100K tokens
+  - Prevent spam: return existing pending order if exists
+  - Generate unique order_code
+  - Calculate VND amount (token_amount * 0.5)
+  - Set 10-minute expiry
+  - Return transfer details + QR code
+
+handleSepayWebhook(payload):
+  - Match order_code from webhook
+  - Mark order as 'completed'
+  - Credit tokens to user balance
+  - Record token_transactions entry
+
+BANK DETAILS (SePay):
+  Bank Code: BIDV
+  Account: 96247CISI1
+  Name: TO TRONG HIEU
+  Transfer Memo: Use order_code
+
+PRICING:
+  1,000,000 tokens = 500,000 VND
+  1 token = 0.5 VND
+  Minimum deposit: 100,000 tokens (50,000 VND)
+
+================================================================================
+7. ENVIRONMENT CONFIGURATION
+================================================================================
+
+.env.example:
+  PORT=3025
+  HOST=0.0.0.0
+  DB_HOST=127.0.0.1
+  DB_PORT=5432
+  DB_NAME=operisagent
+  DB_USER=postgres
+  DB_PASSWORD=
+  JWT_SECRET=your-jwt-secret-change-this
+  JWT_EXPIRES_IN=1h
+  JWT_REFRESH_EXPIRES_IN=7d
+  ANTHROPIC_API_KEY=sk-ant-api03-xxx...
+  ALLOWED_HOSTS=localhost,127.0.0.1,admin.operis.vn
+
+Note: SePay config (SEPAY_BANK_CODE, ACCOUNT, NAME)
+      hardcoded in deposit.service.ts lines 12-14
+
+================================================================================
+8. KEY ARCHITECTURE PATTERNS
+================================================================================
+
+1. Repository Pattern       - Data access abstraction
+2. Service Layer Pattern    - Business logic isolation
+3. Controller Pattern       - HTTP request handling
+4. Middleware Pattern       - Cross-cutting concerns
+5. Factory Pattern          - Error creation
+6. Strategy Pattern         - Multiple auth strategies
+7. Dependency Injection     - Via imports
+
+================================================================================
+9. NAMING CONVENTIONS
+================================================================================
+
+DATABASE:
+  Tables: snake_case (users, token_transactions)
+  Columns: snake_case (password_hash, created_at)
+  Indexes: idx_{table}_{column}
+
+CODE:
+  Interfaces: PascalCase (User, TokenTransaction)
+  Functions: camelCase (getBalance, createUser)
+  Constants: UPPER_SNAKE_CASE (JWT_SECRET)
+  Files: kebab-case (auth.service.ts)
+
+API:
+  Paths: kebab-case, plural (GET /users, POST /chat)
+
+================================================================================
+10. PROJECT STATISTICS
+================================================================================
+
+Total LoC (TypeScript): 13,533 lines
+Total Files: 82 (TS/JS/SQL)
+Database Migrations: 9 schema files
+Controllers: 13 files
+Services: 13 files
+Models/Repositories: 14 files
+Routes: 13 files
+Validators: 4 files
+
+TECH STACK:
+  Runtime: Node.js + TypeScript
+  Framework: Express.js
+  Database: PostgreSQL 14+
+  Auth: JWT + API keys (SHA256)
+  Payment: SePay integration (bank transfers)
+  AI: Claude API (Anthropic)
+
+================================================================================
+11. CRITICAL FILES FOR PAYMENT/TOKEN FLOW
+================================================================================
+
+Token Management:
+  D:\Project\SourceCode\operismb\src\services\token.service.ts
+  D:\Project\SourceCode\operismb\src\db\models\token-transactions.ts
+  D:\Project\SourceCode\operismb\src\db\models\token-usage.ts
+  D:\Project\SourceCode\operismb\src\routes\token.routes.ts
+
+Payment & Deposits:
+  D:\Project\SourceCode\operismb\src\services\deposit.service.ts
+  D:\Project\SourceCode\operismb\src\controllers\deposit.controller.ts
+  D:\Project\SourceCode\operismb\src\routes\deposit.routes.ts
+  D:\Project\SourceCode\operismb\src\db\models\deposits.ts
+
+User Management:
+  D:\Project\SourceCode\operismb\src\db\models\users.ts
+  D:\Project\SourceCode\operismb\src\services\auth.service.ts
+  D:\Project\SourceCode\operismb\src\routes\auth.routes.ts
+
+Chat & API:
+  D:\Project\SourceCode\operismb\src\services\chat.service.ts
+  D:\Project\SourceCode\operismb\src\routes\chat.routes.ts
+  D:\Project\SourceCode\operismb\src\middleware\auth.middleware.ts
+
+================================================================================
+12. UNRESOLVED QUESTIONS
+================================================================================
+
+1. operis-admin/ directory - Admin UI likely separate or WIP
+2. Chat message storage - Full history model in chat-messages.ts
+3. Cron job trigger - How scheduled jobs fire in cron.service.ts
+4. Moltbot integration - Full flow in MOLTBOT_INTEGRATION.md
+5. Rate limiting - Chat routes mention 20 req/min but no middleware
+6. Stripe integration - customers.stripe_customer_id but no service
+7. Cost multipliers - Token costs may vary by model in settings
+
+================================================================================
+SCOUT STATUS: Complete
+Ready for: Development, payment flow setup, token management tasks
+================================================================================
