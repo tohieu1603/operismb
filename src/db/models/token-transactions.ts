@@ -3,6 +3,7 @@
  * CRUD operations for token_transactions table
  */
 
+import pg from "pg";
 import { query, queryOne, queryAll, transaction } from "../connection.js";
 import type { TokenTransaction, TokenTransactionCreate, User } from "./types.js";
 
@@ -122,6 +123,45 @@ export async function creditTokens(
       transaction: txResult.rows[0],
     };
   });
+}
+
+/**
+ * Credit tokens using an existing DB client (for external transaction control).
+ * Same logic as creditTokens but caller owns the transaction.
+ */
+export async function creditTokensWithClient(
+  client: pg.PoolClient,
+  userId: string,
+  amount: number,
+  description?: string,
+  referenceId?: string,
+): Promise<{ user: User; transaction: TokenTransaction }> {
+  const userResult = await client.query<User>(
+    `UPDATE users
+     SET token_balance = token_balance + $1
+     WHERE id = $2
+     RETURNING *`,
+    [amount, userId],
+  );
+
+  if (userResult.rows.length === 0) {
+    throw new Error("User not found");
+  }
+
+  const user = userResult.rows[0];
+
+  const txResult = await client.query<TokenTransaction>(
+    `INSERT INTO token_transactions (
+      user_id, type, amount, balance_after, description, reference_id
+    ) VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING *`,
+    [userId, "credit", amount, user.token_balance, description, referenceId],
+  );
+
+  return {
+    user,
+    transaction: txResult.rows[0],
+  };
 }
 
 /**
@@ -277,6 +317,7 @@ export default {
   listTransactionsByUserId,
   listAllTransactions,
   creditTokens,
+  creditTokensWithClient,
   debitTokens,
   adjustTokens,
 };

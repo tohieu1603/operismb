@@ -153,25 +153,25 @@ export async function adminUpdateTokens(req: Request, res: Response, next: NextF
 }
 
 /**
- * SePay webhook callback
+ * SePay webhook callback.
+ * ALWAYS returns HTTP 200 to prevent SePay retries.
+ * Errors are logged internally but never surfaced.
  */
-export async function sepayWebhook(req: Request, res: Response, next: NextFunction) {
+export async function sepayWebhook(req: Request, res: Response, _next: NextFunction) {
   try {
     const data = req.body;
 
-    // Validate webhook signature if needed
-    // const signature = req.headers['x-sepay-signature'];
-
-    const result = await depositService.processPaymentWebhook({
+    await depositService.processPaymentWebhook({
       transferType: data.transferType,
       transferAmount: data.transferAmount,
       content: data.content,
       referenceCode: data.referenceCode,
       transactionDate: data.transactionDate,
     });
-
-    res.json({ success: result.success });
   } catch (error) {
-    next(error);
+    console.error("[sepay-webhook] Processing error:", error);
   }
+
+  // Always return 200 — SePay requirement
+  res.status(200).json({ success: true });
 }

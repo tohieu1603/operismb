@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(wc:*)",
+      "WebFetch(domain:docs.sepay.vn)",
+      "WebFetch(domain:developer.sepay.vn)"
+    ]
+  }
+}

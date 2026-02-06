@@ -4,7 +4,8 @@
  */
 
 import { Errors } from "../core/errors/api-error.js";
-import { depositsRepo, usersRepo } from "../db/index.js";
+import { depositsRepo, usersRepo, transaction } from "../db/index.js";
+import { creditTokensWithClient } from "../db/models/token-transactions.js";
 import { tokenService } from "./token.service.js";
 import type { DepositOrder } from "../db/models/deposits.js";
 
@@ -12,7 +13,7 @@ import type { DepositOrder } from "../db/models/deposits.js";
 const SEPAY_BANK_CODE = process.env.SEPAY_BANK_CODE || "BIDV";
 const SEPAY_BANK_ACCOUNT = process.env.SEPAY_BANK_ACCOUNT || "96247CISI1";
 const SEPAY_ACCOUNT_NAME = process.env.SEPAY_ACCOUNT_NAME || "TO TRONG HIEU";
-const DEPOSIT_EXPIRY_MINUTES = 10; // Max 10 minutes per order
+const DEPOSIT_EXPIRY_MINUTES = 30; // 30 minutes for bank transfers
 
 export interface CreateDepositInput {
   tokenAmount: number;
@@ -172,7 +173,10 @@ class DepositService {
   }
 
   /**
-   * Process SePay webhook callback
+   * Process SePay webhook callback.
+   * - Idempotent: duplicate referenceCode is a no-op.
+   * - Atomic: order update + token credit in a single DB transaction.
+   * - Late-payment tolerant: expired orders are reactivated.
    */
   async processPaymentWebhook(data: {
     transferType: string;
@@ -184,34 +188,73 @@ class DepositService {
     // Extract order code from transfer content
     const orderCodeMatch = data.content.match(/OP[A-Z0-9]+/);
     if (!orderCodeMatch) {
+      console.warn("[deposit] Webhook: no order code found in content:", data.content);
       return { success: false };
     }
 
     const orderCode = orderCodeMatch[0];
+
+    // Idempotency check: if this referenceCode was already processed, skip
+    if (data.referenceCode) {
+      const existing = await depositsRepo.findByPaymentReference(data.referenceCode);
+      if (existing) {
+        console.log(`[deposit] Webhook: duplicate referenceCode ${data.referenceCode}, skipping`);
+        return { success: true, orderId: existing.id };
+      }
+    }
+
     const order = await depositsRepo.getDepositOrderByCode(orderCode);
 
     if (!order) {
+      console.warn(`[deposit] Webhook: order not found for code ${orderCode}`);
       return { success: false };
     }
 
-    if (order.status !== "pending") {
+    // Already completed → idempotent success
+    if (order.status === "completed") {
       return { success: true, orderId: order.id };
+    }
+
+    // Only process pending or expired orders (late payment recovery)
+    if (order.status !== "pending" && order.status !== "expired") {
+      console.warn(`[deposit] Webhook: order ${order.id} has status ${order.status}, cannot process`);
+      return { success: false };
     }
 
     // Verify amount matches
     if (data.transferAmount < order.amount_vnd) {
+      console.warn(
+        `[deposit] Webhook: amount mismatch for order ${order.id}: expected ${order.amount_vnd}, got ${data.transferAmount}`,
+      );
       return { success: false };
     }
 
-    // Update order status
-    await depositsRepo.updateDepositOrderStatus(order.id, "completed", {
-      payment_method: "bank_transfer",
-      payment_reference: data.referenceCode,
-      paid_at: new Date(data.transactionDate),
+    // Atomic: update order + credit tokens in single transaction
+    await transaction(async (client) => {
+      // Update order status to completed
+      await client.query(
+        `UPDATE deposit_orders
+         SET status = 'completed',
+             payment_method = $2,
+             payment_reference = $3,
+             paid_at = $4
+         WHERE id = $1`,
+        [order.id, "bank_transfer", data.referenceCode, new Date(data.transactionDate)],
+      );
+
+      // Credit tokens to user
+      await creditTokensWithClient(
+        client,
+        order.user_id,
+        order.token_amount,
+        `Deposit: ${orderCode}`,
+        order.id,
+      );
     });
 
-    // Add tokens to user
-    await tokenService.credit(order.user_id, order.token_amount, `Deposit: ${orderCode}`, order.id);
+    console.log(
+      `[deposit] Webhook: order ${order.id} completed — ${order.token_amount} tokens credited to user ${order.user_id}`,
+    );
 
     return { success: true, orderId: order.id };
   }

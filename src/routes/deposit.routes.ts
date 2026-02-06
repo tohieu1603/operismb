@@ -32,6 +32,7 @@ import {
   sepayWebhook,
 } from "../controllers/deposit.controller.js";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware.js";
+import { sepayWebhookMiddleware } from "../middleware/sepay-webhook.middleware.js";
 
 export const depositRoutes = Router();
 
@@ -159,7 +160,7 @@ depositRoutes.get("/pricing", getPricing);
  *
  *     security: []
  */
-depositRoutes.post("/webhook/sepay", sepayWebhook);
+depositRoutes.post("/webhook/sepay", sepayWebhookMiddleware, sepayWebhook);
 
 // Protected endpoints (require auth)
 depositRoutes.use(authMiddleware);
