@@ -141,6 +141,18 @@ export async function updateDepositOrderStatus(
 }
 
 /**
+ * Find deposit order by payment reference (for idempotency check)
+ */
+export async function findByPaymentReference(
+  paymentReference: string,
+): Promise<DepositOrder | null> {
+  return queryOne<DepositOrder>(
+    "SELECT * FROM deposit_orders WHERE payment_reference = $1",
+    [paymentReference],
+  );
+}
+
+/**
  * Get pending orders that have expired
  */
 export async function getExpiredPendingOrders(): Promise<DepositOrder[]> {
@@ -221,6 +233,7 @@ export const depositsRepo = {
   getDepositOrderByCode,
   getUserDepositOrders,
   updateDepositOrderStatus,
+  findByPaymentReference,
   getExpiredPendingOrders,
   markExpiredOrders,
   listAllDeposits,
