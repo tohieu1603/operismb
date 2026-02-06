@@ -120,7 +120,7 @@ class DepositService {
       throw Errors.badRequest("Only pending orders can be cancelled");
     }
 
-    await depositsRepo.updateDepositOrderStatus(orderId, "expired");
+    await depositsRepo.updateDepositOrderStatus(orderId, "cancelled");
     return { success: true };
   }
 
