@@ -66,6 +66,28 @@ class TokenController {
     res.json(result);
   }
 
+  /** POST /tokens/usage - Deduct tokens after AI chat */
+  async deductUsage(req: Request, res: Response): Promise<void> {
+    const { prompt_tokens, completion_tokens, total_tokens, model, request_type, request_id, metadata } = req.body;
+
+    if (!total_tokens || total_tokens <= 0) {
+      res.status(400).json({ error: "total_tokens is required and must be > 0" });
+      return;
+    }
+
+    const result = await tokenService.deductUsage(req.user!.userId, {
+      prompt_tokens: prompt_tokens ?? 0,
+      completion_tokens: completion_tokens ?? 0,
+      total_tokens,
+      model,
+      request_type,
+      request_id,
+      metadata,
+    });
+
+    res.json(result);
+  }
+
   // Admin: Get all transactions across all users
   async getAllTransactions(req: Request, res: Response): Promise<void> {
     const page = parseInt(req.query.page as string) || 1;
