@@ -5,6 +5,7 @@
 
 import type { Request, Response } from "express";
 import { chatService } from "../services/chat.service.js";
+import { chatMessagesRepo } from "../db/index.js";
 import { Errors } from "../core/errors/api-error.js";
 
 class ChatController {
@@ -18,7 +19,7 @@ class ChatController {
       throw Errors.validation("Message is required");
     }
 
-    const result = await chatService.sendMessage(req.user!.userId, message, conversationId);
+    const result = await chatService.sendMessage(req.user!.userId, message, { conversationId });
     res.json(result);
   }
 
@@ -48,8 +49,12 @@ class ChatController {
       throw Errors.validation("Conversation ID is required");
     }
 
-    const messages = await chatService.getHistory(req.user!.userId, conversationId);
-    res.json({ messages });
+    const userId = req.user!.userId;
+    const [messages, usage] = await Promise.all([
+      chatService.getHistory(userId, conversationId),
+      chatMessagesRepo.getConversationUsage(userId, conversationId),
+    ]);
+    res.json({ messages, usage });
   }
 
   /**

@@ -26,12 +26,13 @@ const PRICING: Record<string, { input: number; output: number }> = {
 
 interface StreamOptions {
   conversationId?: string;
+  systemPrompt?: string;
 }
 
 const MAX_HISTORY_MESSAGES = 20;
 
 interface ChatMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
 }
 
@@ -111,8 +112,12 @@ async function streamMessage(
     content: message,
   });
 
-  // Build messages with history + new message
-  const messages: ChatMessage[] = [...history, { role: "user", content: message }];
+  // Build messages: system prompt (if any) + history + new message
+  const messages: ChatMessage[] = [];
+  if (options?.systemPrompt) {
+    messages.push({ role: "system", content: options.systemPrompt });
+  }
+  messages.push(...history, { role: "user", content: message });
 
   // Setup SSE headers (Cloudflare + Nginx compatible)
   res.setHeader("Content-Type", "text/event-stream");
@@ -135,6 +140,7 @@ async function streamMessage(
   let inputTokens = 0;
   let outputTokens = 0;
   let totalTokens = 0;
+  let contextWindow = 0;
 
   try {
     // Call gateway with stream:true
@@ -148,6 +154,7 @@ async function streamMessage(
         model: DEFAULT_MODEL,
         messages, // History + current message
         stream: true,
+        stream_options: { include_usage: true },
         user: `${userId}-${convId}`, // Unique session per user + conversation
       }),
       signal: controller.signal,
@@ -196,6 +203,7 @@ async function streamMessage(
               inputTokens = chunk.usage.prompt_tokens || 0;
               outputTokens = chunk.usage.completion_tokens || 0;
               totalTokens = chunk.usage.total_tokens || 0;
+              contextWindow = chunk.usage.context_window || 0;
             }
           } catch {
             // Skip invalid JSON
@@ -236,12 +244,16 @@ async function streamMessage(
       });
     }
 
-    // Save assistant response
+    // Save assistant response with usage data
     await chatMessagesRepo.createMessage({
       user_id: userId,
       conversation_id: convId,
       role: "assistant",
       content: fullContent,
+      model: DEFAULT_MODEL,
+      provider: "anthropic",
+      tokens_used: totalTokens,
+      cost: totalCost,
     });
 
     // Get updated balance
@@ -254,6 +266,7 @@ async function streamMessage(
         input_tokens: inputTokens,
         output_tokens: outputTokens,
         total_tokens: totalTokens,
+        context_window: contextWindow,
       },
       cost: {
         input: inputCost,
