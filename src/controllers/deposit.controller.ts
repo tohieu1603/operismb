@@ -23,7 +23,24 @@ export async function getPricing(_req: Request, res: Response, next: NextFunctio
 export async function createDeposit(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user!.userId;
-    const { tokenAmount } = req.body;
+    let { tokenAmount } = req.body;
+    const { tierId } = req.body;
+
+    // Resolve tierId to tokenAmount if provided
+    if (!tokenAmount && tierId) {
+      const pricing = depositService.getPricingInfo();
+      const pkg = pricing.packages.find((p) => p.id === tierId);
+      if (!pkg) {
+        res.status(400).json({ error: `Invalid tierId: ${tierId}`, code: "BAD_REQUEST" });
+        return;
+      }
+      tokenAmount = pkg.tokens + pkg.bonus;
+    }
+
+    if (!tokenAmount) {
+      res.status(400).json({ error: "tokenAmount or tierId is required", code: "BAD_REQUEST" });
+      return;
+    }
 
     const order = await depositService.createDeposit(userId, { tokenAmount });
     res.status(201).json(order);
