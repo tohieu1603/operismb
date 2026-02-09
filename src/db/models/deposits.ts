@@ -11,7 +11,7 @@ export interface DepositOrder {
   order_code: string;
   token_amount: number;
   amount_vnd: number;
-  status: "pending" | "completed" | "failed" | "expired";
+  status: "pending" | "completed" | "failed" | "expired" | "cancelled";
   payment_method: string | null;
   payment_reference: string | null;
   paid_at: Date | null;
