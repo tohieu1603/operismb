@@ -67,7 +67,7 @@ class ChatMessagesRepo {
     return queryAll<ChatMessage>(
       `SELECT * FROM (
          SELECT * FROM chat_messages
-         WHERE user_id = $1 AND conversation_id = $2
+         WHERE user_id = $1::uuid AND conversation_id = $2::text
          ORDER BY created_at DESC
          LIMIT $3
        ) sub
@@ -116,8 +116,8 @@ class ChatMessagesRepo {
    */
   async deleteConversation(userId: string, conversationId: string): Promise<void> {
     await query(
-      `DELETE FROM chat_messages 
-       WHERE user_id = $1 AND conversation_id = $2`,
+      `DELETE FROM chat_messages
+       WHERE user_id = $1::uuid AND conversation_id = $2::text`,
       [userId, conversationId],
     );
   }
@@ -135,7 +135,7 @@ class ChatMessagesRepo {
         COALESCE(SUM(cost::numeric), 0) as total_cost,
         COUNT(*) as message_count
        FROM chat_messages
-       WHERE user_id = $1 AND conversation_id = $2`,
+       WHERE user_id = $1::uuid AND conversation_id = $2::text`,
       [userId, conversationId],
     );
     return {
@@ -150,8 +150,8 @@ class ChatMessagesRepo {
    */
   async countMessages(userId: string, conversationId: string): Promise<number> {
     const result = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM chat_messages 
-       WHERE user_id = $1 AND conversation_id = $2`,
+      `SELECT COUNT(*) as count FROM chat_messages
+       WHERE user_id = $1::uuid AND conversation_id = $2::text`,
       [userId, conversationId],
     );
     return parseInt(result?.count || "0", 10);

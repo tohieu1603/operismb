@@ -219,7 +219,8 @@ export async function getCommandStats(
 export async function deleteOldCommands(olderThanDays: number = 90): Promise<number> {
   const result = await query(
     `DELETE FROM commands_log
-     WHERE sent_at < NOW() - INTERVAL '${olderThanDays} days'`,
+     WHERE sent_at < NOW() - $1 * INTERVAL '1 day'`,
+    [olderThanDays],
   );
   return result.rowCount ?? 0;
 }

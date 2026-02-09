@@ -201,7 +201,8 @@ export async function markStaleBoxesOffline(staleMinutes: number = 5): Promise<n
   const result = await query(
     `UPDATE boxes SET status = 'offline'
      WHERE status = 'online'
-       AND last_seen_at < NOW() - INTERVAL '${staleMinutes} minutes'`,
+       AND last_seen_at < NOW() - $1 * INTERVAL '1 minute'`,
+    [staleMinutes],
   );
   return result.rowCount ?? 0;
 }

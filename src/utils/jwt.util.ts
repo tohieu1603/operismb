@@ -5,10 +5,15 @@
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 
-// Secret keys (should be in env)
-const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "operis-access-secret-change-in-production";
-const REFRESH_SECRET =
-  process.env.JWT_REFRESH_SECRET || "operis-refresh-secret-change-in-production";
+// Secret keys — required via env, no fallback
+function requireEnv(name: string): string {
+  const val = process.env[name];
+  if (!val) throw new Error(`[jwt] ${name} must be set in environment variables`);
+  return val;
+}
+
+const ACCESS_SECRET = requireEnv("JWT_ACCESS_SECRET");
+const REFRESH_SECRET = requireEnv("JWT_REFRESH_SECRET");
 
 // Token expiration
 const ACCESS_EXPIRES_IN = "1h";

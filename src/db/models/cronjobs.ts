@@ -514,8 +514,9 @@ export async function startCronjobRun(cronjobId: string): Promise<CronjobExecuti
 export async function deleteOldExecutions(olderThanDays: number = 30): Promise<number> {
   const result = await queryAll<{ id: string }>(
     `DELETE FROM cronjob_executions
-     WHERE started_at < NOW() - INTERVAL '${olderThanDays} days'
+     WHERE started_at < NOW() - $1 * INTERVAL '1 day'
      RETURNING id`,
+    [olderThanDays],
   );
   return result.length;
 }
