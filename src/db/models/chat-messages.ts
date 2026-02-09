@@ -35,7 +35,7 @@ class ChatMessagesRepo {
    */
   async createMessage(input: CreateMessageInput): Promise<ChatMessage> {
     const result = await queryOne<ChatMessage>(
-      `INSERT INTO chat_messages 
+      `INSERT INTO chat_messages
         (user_id, conversation_id, role, content, model, provider, tokens_used, cost)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
@@ -67,7 +67,7 @@ class ChatMessagesRepo {
     return queryAll<ChatMessage>(
       `SELECT * FROM (
          SELECT * FROM chat_messages
-         WHERE user_id = $1::uuid AND conversation_id = $2::text
+         WHERE user_id = $1::uuid AND conversation_id = $2
          ORDER BY created_at DESC
          LIMIT $3
        ) sub
@@ -99,9 +99,9 @@ class ChatMessagesRepo {
     limit: number = 20,
   ): Promise<{ conversation_id: string; last_message: string; created_at: Date }[]> {
     return queryAll(
-      `SELECT DISTINCT ON (conversation_id) 
-        conversation_id, 
-        content as last_message, 
+      `SELECT DISTINCT ON (conversation_id)
+        conversation_id,
+        content as last_message,
         created_at
        FROM chat_messages
        WHERE user_id = $1::uuid
@@ -117,7 +117,7 @@ class ChatMessagesRepo {
   async deleteConversation(userId: string, conversationId: string): Promise<void> {
     await query(
       `DELETE FROM chat_messages
-       WHERE user_id = $1::uuid AND conversation_id = $2::text`,
+       WHERE user_id = $1::uuid AND conversation_id = $2`,
       [userId, conversationId],
     );
   }
@@ -135,7 +135,7 @@ class ChatMessagesRepo {
         COALESCE(SUM(cost::numeric), 0) as total_cost,
         COUNT(*) as message_count
        FROM chat_messages
-       WHERE user_id = $1::uuid AND conversation_id = $2::text`,
+       WHERE user_id = $1::uuid AND conversation_id = $2`,
       [userId, conversationId],
     );
     return {
@@ -151,7 +151,7 @@ class ChatMessagesRepo {
   async countMessages(userId: string, conversationId: string): Promise<number> {
     const result = await queryOne<{ count: string }>(
       `SELECT COUNT(*) as count FROM chat_messages
-       WHERE user_id = $1::uuid AND conversation_id = $2::text`,
+       WHERE user_id = $1::uuid AND conversation_id = $2`,
       [userId, conversationId],
     );
     return parseInt(result?.count || "0", 10);
