@@ -420,7 +420,7 @@ export async function completeExecution(
 
   if (!execution) return null;
 
-  const durationMs = finishedAt.getTime() - new Date(execution.started_at).getTime();
+  const durationMs = Math.max(0, finishedAt.getTime() - new Date(execution.started_at).getTime());
 
   return queryOne<CronjobExecution>(
     `UPDATE cronjob_executions SET
