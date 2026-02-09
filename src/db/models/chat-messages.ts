@@ -83,7 +83,7 @@ class ChatMessagesRepo {
   async getLatestConversationId(userId: string): Promise<string | null> {
     const result = await queryOne<{ conversation_id: string }>(
       `SELECT conversation_id FROM chat_messages
-       WHERE user_id = $1
+       WHERE user_id = $1::uuid
        ORDER BY created_at DESC
        LIMIT 1`,
       [userId],
@@ -104,7 +104,7 @@ class ChatMessagesRepo {
         content as last_message, 
         created_at
        FROM chat_messages
-       WHERE user_id = $1
+       WHERE user_id = $1::uuid
        ORDER BY conversation_id, created_at DESC
        LIMIT $2`,
       [userId, limit],
