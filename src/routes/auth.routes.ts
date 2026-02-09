@@ -292,7 +292,10 @@ router.post(
  *
  *     security: []
  */
-router.post("/logout", (req, res) => authController.logout(req, res));
+router.post(
+  "/logout",
+  asyncHandler((req, res) => authController.logout(req, res)),
+);
 
 // =============================================================================
 // PROTECTED ROUTES - Yêu cầu JWT authentication
