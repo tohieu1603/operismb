@@ -420,7 +420,7 @@ export async function completeExecution(
 
   if (!execution) return null;
 
-  const durationMs = finishedAt.getTime() - new Date(execution.started_at).getTime();
+  const durationMs = Math.max(0, finishedAt.getTime() - new Date(execution.started_at).getTime());
 
   return queryOne<CronjobExecution>(
     `UPDATE cronjob_executions SET
@@ -514,8 +514,9 @@ export async function startCronjobRun(cronjobId: string): Promise<CronjobExecuti
 export async function deleteOldExecutions(olderThanDays: number = 30): Promise<number> {
   const result = await queryAll<{ id: string }>(
     `DELETE FROM cronjob_executions
-     WHERE started_at < NOW() - INTERVAL '${olderThanDays} days'
+     WHERE started_at < NOW() - $1 * INTERVAL '1 day'
      RETURNING id`,
+    [olderThanDays],
   );
   return result.length;
 }

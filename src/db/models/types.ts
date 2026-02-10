@@ -449,6 +449,31 @@ export interface UserApiKeyUpdate {
 }
 
 // ============================================================================
+// Refresh Token Types
+// ============================================================================
+export interface RefreshToken {
+  id: string;
+  user_id: string;
+  token_hash: string;
+  family: string;
+  is_revoked: boolean;
+  revoked_at: Date | null;
+  user_agent: string | null;
+  ip_address: string | null;
+  expires_at: Date;
+  created_at: Date;
+}
+
+export interface RefreshTokenCreate {
+  user_id: string;
+  token_hash: string;
+  family: string;
+  expires_at: Date;
+  user_agent?: string;
+  ip_address?: string;
+}
+
+// ============================================================================
 // Token Transaction Types
 // ============================================================================
 export interface TokenTransaction {
