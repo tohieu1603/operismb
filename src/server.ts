@@ -63,7 +63,7 @@ async function main() {
   });
 
   // Swagger docs
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   // API routes
   app.use("/api", operisRouter);
