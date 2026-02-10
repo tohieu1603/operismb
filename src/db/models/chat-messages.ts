@@ -14,6 +14,8 @@ export interface ChatMessage {
   model?: string;
   provider?: string;
   tokens_used?: number;
+  input_tokens?: number;
+  output_tokens?: number;
   cost?: number;
   created_at: Date;
 }
@@ -26,6 +28,8 @@ export interface CreateMessageInput {
   model?: string;
   provider?: string;
   tokens_used?: number;
+  input_tokens?: number;
+  output_tokens?: number;
   cost?: number;
 }
 
@@ -36,8 +40,8 @@ class ChatMessagesRepo {
   async createMessage(input: CreateMessageInput): Promise<ChatMessage> {
     const result = await queryOne<ChatMessage>(
       `INSERT INTO chat_messages
-        (user_id, conversation_id, role, content, model, provider, tokens_used, cost)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        (user_id, conversation_id, role, content, model, provider, tokens_used, input_tokens, output_tokens, cost)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         input.user_id,
@@ -47,6 +51,8 @@ class ChatMessagesRepo {
         input.model || null,
         input.provider || null,
         input.tokens_used || 0,
+        input.input_tokens || 0,
+        input.output_tokens || 0,
         input.cost || 0,
       ],
     );

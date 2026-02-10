@@ -387,6 +387,7 @@ export interface User {
   gateway_url: string | null;
   gateway_token: string | null;
   gateway_hooks_token: string | null; // Separate token for /hooks/* endpoints
+  auth_profiles_path: string | null; // Path to OpenClaw auth-profiles.json on user's machine
   created_at: Date;
   updated_at: Date;
 }
@@ -412,6 +413,7 @@ export interface UserUpdate {
   gateway_url?: string | null;
   gateway_token?: string | null;
   gateway_hooks_token?: string | null;
+  auth_profiles_path?: string | null;
 }
 
 // ============================================================================

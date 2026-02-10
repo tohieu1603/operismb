@@ -89,6 +89,10 @@ export async function updateUser(id: string, data: UserUpdate): Promise<User | n
     fields.push(`gateway_token = $${paramIndex++}`);
     values.push(data.gateway_token);
   }
+  if (data.auth_profiles_path !== undefined) {
+    fields.push(`auth_profiles_path = $${paramIndex++}`);
+    values.push(data.auth_profiles_path);
+  }
 
   if (fields.length === 0) {
     return getUserById(id);

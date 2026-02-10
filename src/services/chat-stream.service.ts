@@ -253,6 +253,8 @@ async function streamMessage(
       model: DEFAULT_MODEL,
       provider: "anthropic",
       tokens_used: totalTokens,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
       cost: totalCost,
     });
 
