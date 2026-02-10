@@ -14,6 +14,8 @@ import { usersRepo, chatMessagesRepo } from "../db/index.js";
 // Config
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 const STREAM_TIMEOUT_MS = 120_000;
+const MAX_RETRIES = 2;
+const AUTH_ERROR_PATTERN = /authentication_error|invalid.*api.key|unauthorized|rate_limit|credit.*balance.*low|billing/i;
 
 // Pricing per million tokens (USD)
 const PRICING: Record<string, { input: number; output: number }> = {
@@ -133,9 +135,6 @@ async function streamMessage(
     (res as unknown as { flush: () => void }).flush();
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
-
   let fullContent = "";
   let inputTokens = 0;
   let outputTokens = 0;
@@ -143,73 +142,109 @@ async function streamMessage(
   let contextWindow = 0;
 
   try {
-    // Call gateway with stream:true
-    const response = await fetch(`${user.gateway_url}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${user.gateway_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        messages, // History + current message
-        stream: true,
-        stream_options: { include_usage: true },
-        user: `${userId}-${convId}`, // Unique session per user + conversation
-      }),
-      signal: controller.signal,
-    });
+    // Retry loop: on auth error in first chunk, retry so gateway rotates auth profile
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const attemptController = new AbortController();
+      const attemptTimeout = setTimeout(() => attemptController.abort(), STREAM_TIMEOUT_MS);
 
-    clearTimeout(timeoutId);
+      const response = await fetch(`${user.gateway_url}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${user.gateway_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: DEFAULT_MODEL,
+          messages,
+          stream: true,
+          stream_options: { include_usage: true },
+          user: `${userId}-${convId}`,
+        }),
+        signal: attemptController.signal,
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gateway error: ${errorText}`);
-    }
+      clearTimeout(attemptTimeout);
 
-    if (!response.body) {
-      throw new Error("No response body");
-    }
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gateway error: ${errorText}`);
+      }
 
-    // Read stream
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+      if (!response.body) {
+        throw new Error("No response body");
+      }
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+      // Read stream, buffer first delta to detect auth errors before sending to client
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let firstDeltaSent = false;
+      let isAuthError = false;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6).trim();
-          if (data === "[DONE]") continue;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
 
-          try {
-            const chunk = JSON.parse(data);
-            const delta = chunk.choices?.[0]?.delta?.content;
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") continue;
 
-            if (delta) {
-              fullContent += delta;
-              sendSSE(res, "content", { delta, content: fullContent });
+            try {
+              const chunk = JSON.parse(data);
+              const delta = chunk.choices?.[0]?.delta?.content;
+
+              if (delta) {
+                // Check first delta for auth error before sending anything to client
+                if (!firstDeltaSent && AUTH_ERROR_PATTERN.test(delta)) {
+                  isAuthError = true;
+                  reader.cancel();
+                  break;
+                }
+                firstDeltaSent = true;
+                fullContent += delta;
+                sendSSE(res, "content", { delta, content: fullContent });
+              }
+
+              if (chunk.usage) {
+                inputTokens = chunk.usage.prompt_tokens || 0;
+                outputTokens = chunk.usage.completion_tokens || 0;
+                totalTokens = chunk.usage.total_tokens || 0;
+                contextWindow = chunk.usage.context_window || 0;
+              }
+            } catch {
+              // Skip invalid JSON
             }
-
-            // Capture usage if available (use gateway values directly)
-            if (chunk.usage) {
-              inputTokens = chunk.usage.prompt_tokens || 0;
-              outputTokens = chunk.usage.completion_tokens || 0;
-              totalTokens = chunk.usage.total_tokens || 0;
-              contextWindow = chunk.usage.context_window || 0;
-            }
-          } catch {
-            // Skip invalid JSON
           }
         }
+        if (isAuthError) break;
       }
+
+      // If auth error detected in first chunk, retry
+      if (isAuthError && attempt < MAX_RETRIES - 1) {
+        console.warn(`[chat-stream] Auth error in first chunk (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+        await new Promise((r) => setTimeout(r, 1000));
+        fullContent = "";
+        inputTokens = 0;
+        outputTokens = 0;
+        totalTokens = 0;
+        contextWindow = 0;
+        continue;
+      }
+
+      if (isAuthError) {
+        console.error(`[chat-stream] All ${MAX_RETRIES} attempts failed with auth error`);
+        sendSSE(res, "error", { error: "All API keys failed. Please check your token vault." });
+        res.end();
+        return;
+      }
+
+      // Success — break retry loop
+      break;
     }
 
     // Estimate tokens if not provided by gateway
@@ -253,6 +288,8 @@ async function streamMessage(
       model: DEFAULT_MODEL,
       provider: "anthropic",
       tokens_used: totalTokens,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
       cost: totalCost,
     });
 
@@ -280,7 +317,6 @@ async function streamMessage(
     const errorMsg = error instanceof Error ? error.message : "Stream failed";
     sendSSE(res, "error", { error: errorMsg });
   } finally {
-    clearTimeout(timeoutId);
     res.end();
   }
 }

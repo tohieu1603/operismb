@@ -116,6 +116,18 @@ export async function hybridAuthMiddleware(
 }
 
 /**
+ * Optional JWT auth - parse token if present, skip if missing/invalid
+ */
+export function optionalAuthMiddleware(req: Request, _res: Response, next: NextFunction): void {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    const payload = verifyAccessToken(authHeader.slice(7));
+    if (payload) req.user = payload;
+  }
+  next();
+}
+
+/**
  * Role check middleware factory
  * Usage: router.use(requireRole('admin'))
  */

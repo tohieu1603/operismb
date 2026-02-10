@@ -16,6 +16,7 @@ import {
   cronRoutes,
   gatewayProxyRoutes,
   analyticsRoutes,
+  tokenVaultRoutes,
 } from "./routes/index.js";
 import { errorMiddleware } from "./middleware/index.js";
 
@@ -37,6 +38,7 @@ operisRouter.use("/settings", settingsRoutes);
 operisRouter.use("/cron", cronRoutes);
 operisRouter.use("/v1/gateway", gatewayProxyRoutes);
 operisRouter.use("/analytics", analyticsRoutes);
+operisRouter.use("/token-vault", tokenVaultRoutes);
 
 // Global error handler - must be last
 operisRouter.use(errorMiddleware);
