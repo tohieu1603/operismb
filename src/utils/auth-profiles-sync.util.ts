@@ -67,11 +67,29 @@ export async function syncAuthProfiles(userAuthProfilesPath?: string | null): Pr
     // Use user-specific path, then env var, then default
     const filePath = userAuthProfilesPath || getAuthProfilesPath();
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify({
+
+    // Read existing file to preserve usageStats and other OpenClaw tracking data
+    let existing: Record<string, unknown> = {};
+    try {
+      const content = fs.readFileSync(filePath, "utf8");
+      existing = JSON.parse(content);
+    } catch {
+      // File doesn't exist or invalid JSON — start fresh
+    }
+
+    // Merge: only update token in each profile, keep everything else intact
+    const existingProfiles = (existing.profiles as Record<string, Record<string, unknown>>) || {};
+    for (const [id, newProfile] of Object.entries(profiles)) {
+      existingProfiles[id] = { ...existingProfiles[id], ...newProfile };
+    }
+
+    const merged = {
+      ...existing,
       version: 1,
-      profiles,
-      lastGood: { anthropic: "anthropic:default" },
-    }, null, 2) + "\n");
+      profiles: existingProfiles,
+    };
+
+    fs.writeFileSync(filePath, JSON.stringify(merged, null, 2) + "\n");
 
     console.log(`[auth-sync] auth-profiles.json updated with ${tokens.length} token(s) → ${filePath}`);
   } catch (err) {
@@ -88,7 +106,17 @@ export async function clearAuthProfiles(userAuthProfilesPath?: string | null): P
     const filePath = userAuthProfilesPath || getAuthProfilesPath();
     if (!fs.existsSync(filePath)) return;
 
+    // Read existing to preserve usageStats
+    let existing: Record<string, unknown> = {};
+    try {
+      const content = fs.readFileSync(filePath, "utf8");
+      existing = JSON.parse(content);
+    } catch {
+      // Invalid JSON — overwrite entirely
+    }
+
     fs.writeFileSync(filePath, JSON.stringify({
+      ...existing,
       version: 1,
       profiles: {},
       lastGood: {},

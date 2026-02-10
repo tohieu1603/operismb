@@ -13,7 +13,7 @@
 
 import { Router } from "express";
 import { authController } from "../controllers/auth.controller.js";
-import { authMiddleware, asyncHandler } from "../middleware/index.js";
+import { authMiddleware, optionalAuthMiddleware, asyncHandler } from "../middleware/index.js";
 import { validateBody } from "../middleware/validate.middleware.js";
 import { validateRegister, validateLogin, validateRefresh } from "../validators/auth.validator.js";
 
@@ -294,6 +294,7 @@ router.post(
  */
 router.post(
   "/logout",
+  optionalAuthMiddleware,
   asyncHandler((req, res) => authController.logout(req, res)),
 );
 

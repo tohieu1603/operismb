@@ -41,21 +41,21 @@ class AuthController {
 
   async logout(req: Request, res: Response): Promise<void> {
     const { refreshToken } = req.body ?? {};
-    // Extract user info before revoking token
-    let authProfilesPath: string | null = null;
-    let userId: string | null = null;
-    if (refreshToken) {
-      const claims = verifyRefreshToken(refreshToken);
-      if (claims?.userId) {
-        userId = claims.userId;
-        const user = await getUserById(claims.userId);
-        authProfilesPath = user?.auth_profiles_path ?? null;
-      }
-    }
+    // Use userId from access token (auth middleware) as primary; fallback to refreshToken claims
+    const userId = req.user?.userId
+      ?? (refreshToken ? verifyRefreshToken(refreshToken)?.userId : null)
+      ?? null;
+
     await authService.logout(refreshToken);
-    // Clear auth-profiles: local filesystem + push empty to remote gateway (non-blocking)
+
+    // Clear auth-profiles: local filesystem + push empty to remote gateway
+    let authProfilesPath: string | null = null;
+    if (userId) {
+      const user = await getUserById(userId);
+      authProfilesPath = user?.auth_profiles_path ?? null;
+      clearAuthProfilesViaGateway(userId);
+    }
     clearAuthProfiles(authProfilesPath);
-    if (userId) clearAuthProfilesViaGateway(userId);
     res.json({ success: true });
   }
 

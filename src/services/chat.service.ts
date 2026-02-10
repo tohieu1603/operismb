@@ -254,32 +254,62 @@ class ChatService {
     console.log("[chat] Gateway token:", gatewayToken?.slice(0, 10) + "...");
     console.log("[chat] Messages:", apiMessages.length, "| Tools:", apiTools?.length ?? 0);
 
+    // Auth error pattern: gateway returns 200 but content is an auth error from upstream
+    const AUTH_ERROR_PATTERN = /authentication_error|invalid.*api.key|unauthorized|rate_limit|credit.*balance.*low|billing/i;
+    const MAX_RETRIES = 2;
+
     try {
-      const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${gatewayToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: DEFAULT_MODEL,
-          messages: apiMessages,
-          max_tokens: MAX_TOKENS,
-          user: options?.sessionKey, // Gateway session key
-          ...(apiTools ? { tools: apiTools } : {}),
-        }),
-        signal: controller.signal,
-      });
+      let data: any;
 
-      clearTimeout(timeoutId);
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        const attemptController = new AbortController();
+        const attemptTimeout = setTimeout(() => attemptController.abort(), CHAT_TIMEOUT_MS);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[chat] Gateway error:", errorText);
-        throw Errors.serviceUnavailable("Gateway error");
+        const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${gatewayToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: DEFAULT_MODEL,
+            messages: apiMessages,
+            max_tokens: MAX_TOKENS,
+            user: options?.sessionKey,
+            ...(apiTools ? { tools: apiTools } : {}),
+          }),
+          signal: attemptController.signal,
+        });
+
+        clearTimeout(attemptTimeout);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("[chat] Gateway error:", errorText);
+          throw Errors.serviceUnavailable("Gateway error");
+        }
+
+        data = await response.json();
+
+        // Detect auth error hidden in response content
+        const responseText = data.choices?.[0]?.message?.content || "";
+        if (AUTH_ERROR_PATTERN.test(responseText) && attempt < MAX_RETRIES - 1) {
+          console.warn(`[chat] Auth error in response (attempt ${attempt + 1}/${MAX_RETRIES}): ${responseText.slice(0, 80)}`);
+          // Brief delay to let gateway rotate to next auth profile
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+
+        // If still an auth error on last attempt, throw instead of returning error as content
+        if (AUTH_ERROR_PATTERN.test(responseText)) {
+          console.error(`[chat] All ${MAX_RETRIES} attempts failed with auth error:`, responseText);
+          throw Errors.serviceUnavailable(`API key error: ${responseText.slice(0, 100)}`);
+        }
+
+        break;
       }
 
-      const data = await response.json();
+      clearTimeout(timeoutId);
       console.log("[chat] Gateway response usage:", JSON.stringify(data.usage), "| Estimated if 0");
 
       // Parse OpenAI-compatible response to Anthropic format
