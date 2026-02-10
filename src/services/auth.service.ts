@@ -153,6 +153,23 @@ class AuthService {
     if (!user) throw Errors.notFound("User");
     return sanitizeUser(user);
   }
+
+  /** Update gateway_url and gateway_token for the authenticated user */
+  async updateGateway(
+    userId: string,
+    data: { gateway_url?: string | null; gateway_token?: string | null },
+  ): Promise<SafeUser> {
+    const user = await usersRepo.getUserById(userId);
+    if (!user) throw Errors.notFound("User");
+
+    const updated = await usersRepo.updateUser(userId, {
+      gateway_url: data.gateway_url,
+      gateway_token: data.gateway_token,
+    });
+    if (!updated) throw Errors.notFound("User");
+
+    return sanitizeUser(updated);
+  }
 }
 
 export const authService = new AuthService();

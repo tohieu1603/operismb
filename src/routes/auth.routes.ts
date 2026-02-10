@@ -356,4 +356,75 @@ router.get(
   asyncHandler((req, res) => authController.getMe(req, res)),
 );
 
+/**
+ * @swagger
+ * /auth/me/gateway:
+ *   patch:
+ *     tags: [Auth]
+ *     summary: Cập nhật gateway configuration
+ *     description: |
+ *       User tự cập nhật gateway_url và gateway_token của mình.
+ *
+ *       **Use case:** Sau khi đăng nhập, frontend gọi endpoint này
+ *       để cấu hình gateway cho user.
+ *
+ *       **Gửi `null` để xóa giá trị hiện tại.**
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               gateway_url:
+ *                 type: string
+ *                 nullable: true
+ *                 description: URL của Moltbot gateway
+ *                 example: "http://localhost:18789"
+ *               gateway_token:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Authentication token cho gateway
+ *                 example: "gw_abc123xyz"
+ *           examples:
+ *             updateBoth:
+ *               summary: Cập nhật cả URL và token
+ *               value:
+ *                 gateway_url: "http://localhost:18789"
+ *                 gateway_token: "gw_abc123xyz"
+ *             updateTokenOnly:
+ *               summary: Chỉ cập nhật token
+ *               value:
+ *                 gateway_token: "gw_new_token_456"
+ *             clearGateway:
+ *               summary: Xóa cấu hình gateway
+ *               value:
+ *                 gateway_url: null
+ *                 gateway_token: null
+ *
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *
+ *       401:
+ *         description: Chưa đăng nhập hoặc token hết hạn
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *
+ *     security:
+ *       - BearerAuth: []
+ */
+router.patch(
+  "/me/gateway",
+  authMiddleware,
+  asyncHandler((req, res) => authController.updateGateway(req, res)),
+);
+
 export default router;
