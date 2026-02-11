@@ -200,58 +200,66 @@ async function streamMessage(
         let firstDeltaSent = false;
         let isAuthError = false;
 
-        while (true) {
-          // Per-chunk timeout: abort if no data for CHUNK_TIMEOUT_MS
-          const chunkResult = await Promise.race([
-            reader.read(),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("Chunk timeout")), CHUNK_TIMEOUT_MS),
-            ),
-          ]);
+        try {
+          while (true) {
+            // Race: reader vs chunk timeout vs client disconnect (abort signal)
+            const chunkResult = await Promise.race([
+              reader.read(),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("Chunk timeout")), CHUNK_TIMEOUT_MS),
+              ),
+              new Promise<never>((_, reject) => {
+                if (attemptController.signal.aborted) return reject(new Error("Client disconnected"));
+                attemptController.signal.addEventListener("abort", () => reject(new Error("Client disconnected")), { once: true });
+              }),
+            ]);
 
-          const { done, value } = chunkResult;
-          if (done) break;
-          if (clientDisconnected) { reader.cancel(); break; }
+            const { done, value } = chunkResult;
+            if (done) break;
+            if (clientDisconnected) break;
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
 
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6).trim();
-              if (data === "[DONE]") continue;
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim();
+                if (data === "[DONE]") continue;
 
-              try {
-                const chunk = JSON.parse(data);
-                const delta = chunk.choices?.[0]?.delta?.content;
+                try {
+                  const chunk = JSON.parse(data);
+                  const delta = chunk.choices?.[0]?.delta?.content;
 
-                if (delta) {
-                  // Check first delta for auth error before sending anything to client
-                  if (!firstDeltaSent && AUTH_ERROR_PATTERN.test(delta)) {
-                    isAuthError = true;
-                    reader.cancel();
-                    break;
+                  if (delta) {
+                    // Check first delta for auth error before sending anything to client
+                    if (!firstDeltaSent && AUTH_ERROR_PATTERN.test(delta)) {
+                      isAuthError = true;
+                      break;
+                    }
+                    firstDeltaSent = true;
+                    fullContent += delta;
+                    if (!clientDisconnected) {
+                      sendSSE(res, "content", { delta, content: fullContent });
+                    }
                   }
-                  firstDeltaSent = true;
-                  fullContent += delta;
-                  if (!clientDisconnected) {
-                    sendSSE(res, "content", { delta, content: fullContent });
-                  }
-                }
 
-                if (chunk.usage) {
-                  inputTokens = chunk.usage.prompt_tokens || 0;
-                  outputTokens = chunk.usage.completion_tokens || 0;
-                  totalTokens = chunk.usage.total_tokens || 0;
-                  contextWindow = chunk.usage.context_window || 0;
+                  if (chunk.usage) {
+                    inputTokens = chunk.usage.prompt_tokens || 0;
+                    outputTokens = chunk.usage.completion_tokens || 0;
+                    totalTokens = chunk.usage.total_tokens || 0;
+                    contextWindow = chunk.usage.context_window || 0;
+                  }
+                } catch {
+                  // Skip invalid JSON
                 }
-              } catch {
-                // Skip invalid JSON
               }
             }
+            if (isAuthError) break;
           }
-          if (isAuthError) break;
+        } finally {
+          // Always cancel reader to close gateway connection and stop processing
+          reader.cancel().catch(() => {});
         }
 
         // If auth error detected in first chunk, retry
