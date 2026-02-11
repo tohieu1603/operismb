@@ -15,6 +15,7 @@ import {
   settingsRoutes,
   cronRoutes,
   gatewayProxyRoutes,
+  gatewayRegisterRoutes,
   analyticsRoutes,
   tokenVaultRoutes,
 } from "./routes/index.js";
@@ -39,6 +40,7 @@ operisRouter.use("/cron", cronRoutes);
 operisRouter.use("/v1/gateway", gatewayProxyRoutes);
 operisRouter.use("/analytics", analyticsRoutes);
 operisRouter.use("/token-vault", tokenVaultRoutes);
+operisRouter.use("/gateway", gatewayRegisterRoutes);
 
 // Global error handler - must be last
 operisRouter.use(errorMiddleware);
