@@ -136,7 +136,14 @@ export async function clearAuthProfiles(userAuthProfilesPath?: string | null): P
 const GATEWAY_PUSH_TIMEOUT_MS = 10_000;
 const REGISTER_SECRET = process.env.GATEWAY_REGISTER_SECRET || "operis-gateway-register-secret";
 // operis-api public URL for gateway callback (gateway → operis-api PUT /gateway/register)
-const OPERIS_API_URL = process.env.OPERIS_API_URL || "http://127.0.0.1:3025";
+function getOperisApiUrl(): string {
+  const raw = process.env.OPERIS_API_URL || "http://127.0.0.1:3025";
+  // Auto-add https:// if user forgot the protocol
+  if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
+    return `https://${raw}`;
+  }
+  return raw;
+}
 
 /** Build auth-profiles JSON from vault tokens */
 async function buildAuthProfilesJson(): Promise<{
@@ -265,7 +272,7 @@ export async function pushAuthProfilesToGateway(userId: string): Promise<void> {
 
     // Include callback so gateway calls back PUT /gateway/register with its real token
     const callback = {
-      url: `${OPERIS_API_URL}/api/gateway/register`,
+      url: `${getOperisApiUrl()}/api/gateway/register`,
       email: freshUser.email,
       secret: REGISTER_SECRET,
     };
