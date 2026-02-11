@@ -148,6 +148,59 @@ class AuthService {
     }
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await usersRepo.getUserById(userId);
+    if (!user) throw Errors.notFound("User");
+
+    const valid = await verifyPassword(currentPassword, user.password_hash);
+    if (!valid) throw Errors.invalidCredentials();
+
+    const newHash = await hashPassword(newPassword);
+    await usersRepo.updateUser(userId, { password_hash: newHash });
+
+    // Revoke all refresh tokens on password change (security)
+    await refreshTokensRepo.revokeAllForUser(userId);
+  }
+
+  /** Admin: create a new user account */
+  async createUserByAdmin(params: {
+    email: string;
+    password: string;
+    name: string;
+    role?: "admin" | "user";
+    is_active?: boolean;
+    token_balance?: number;
+    unique_machine?: string;
+    gateway_url?: string;
+    gateway_token?: string;
+    gateway_hooks_token?: string;
+    auth_profiles_path?: string;
+  }): Promise<SafeUser> {
+    const existing = await usersRepo.getUserByEmail(params.email);
+    if (existing) throw Errors.conflict("Email already exists");
+
+    if (params.unique_machine) {
+      const machineUser = await usersRepo.getUserByMachine(params.unique_machine);
+      if (machineUser) throw Errors.conflict("Machine ID already in use");
+    }
+
+    const user = await usersRepo.createUser({
+      email: params.email,
+      password_hash: await hashPassword(params.password),
+      name: params.name,
+      role: params.role ?? "user",
+      token_balance: params.token_balance ?? 1000000,
+      is_active: params.is_active,
+      unique_machine: params.unique_machine,
+      gateway_url: params.gateway_url,
+      gateway_token: params.gateway_token,
+      gateway_hooks_token: params.gateway_hooks_token,
+      auth_profiles_path: params.auth_profiles_path,
+    });
+
+    return sanitizeUser(user);
+  }
+
   async getMe(userId: string): Promise<SafeUser> {
     const user = await usersRepo.getUserById(userId);
     if (!user) throw Errors.notFound("User");

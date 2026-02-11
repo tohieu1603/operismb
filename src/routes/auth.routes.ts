@@ -13,9 +13,9 @@
 
 import { Router } from "express";
 import { authController } from "../controllers/auth.controller.js";
-import { authMiddleware, optionalAuthMiddleware, asyncHandler } from "../middleware/index.js";
+import { authMiddleware, optionalAuthMiddleware, adminMiddleware, asyncHandler } from "../middleware/index.js";
 import { validateBody } from "../middleware/validate.middleware.js";
-import { validateRegister, validateLogin, validateRefresh } from "../validators/auth.validator.js";
+import { validateRegister, validateLogin, validateRefresh, validateChangePassword, validateCreateUser } from "../validators/auth.validator.js";
 
 const router = Router();
 
@@ -355,6 +355,37 @@ router.get(
   "/me",
   authMiddleware,
   asyncHandler((req, res) => authController.getMe(req, res)),
+);
+
+/**
+ * POST /auth/change-password
+ * Change password for the current user
+ * Requires: valid JWT
+ * Body: { currentPassword, newPassword }
+ */
+router.post(
+  "/change-password",
+  authMiddleware,
+  validateBody(validateChangePassword),
+  asyncHandler((req, res) => authController.changePassword(req, res)),
+);
+
+// =============================================================================
+// ADMIN ROUTES - Yêu cầu admin role
+// =============================================================================
+
+/**
+ * POST /auth/users
+ * Admin: create a new user account
+ * Requires: admin JWT
+ * Body: { email, password, name, role?, token_balance?, unique_machine? }
+ */
+router.post(
+  "/users",
+  authMiddleware,
+  adminMiddleware,
+  validateBody(validateCreateUser),
+  asyncHandler((req, res) => authController.createUser(req, res)),
 );
 
 export default router;
