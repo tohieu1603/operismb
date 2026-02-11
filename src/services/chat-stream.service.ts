@@ -13,9 +13,11 @@ import { usersRepo, chatMessagesRepo } from "../db/index.js";
 
 // Config
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
-const STREAM_TIMEOUT_MS = 120_000;
+const STREAM_TIMEOUT_MS = 180_000; // Total stream timeout (covers fetch + reading)
+const CHUNK_TIMEOUT_MS = 60_000; // Max wait between chunks before aborting
+const KEEPALIVE_INTERVAL_MS = 15_000; // SSE keepalive ping to prevent tunnel idle timeout
 const MAX_RETRIES = 2;
-const AUTH_ERROR_PATTERN = /authentication_error|invalid.*api.key|unauthorized|rate_limit|credit.*balance.*low|billing/i;
+const AUTH_ERROR_PATTERN = /authentication_error|invalid.*api.key|unauthorized|rate_limit|credit.*balance.*low|billing|FailoverError/i;
 
 // Pricing per million tokens (USD)
 const PRICING: Record<string, { input: number; output: number }> = {
@@ -141,110 +143,144 @@ async function streamMessage(
   let totalTokens = 0;
   let contextWindow = 0;
 
+  // Track client disconnect to abort gateway stream early
+  let clientDisconnected = false;
+  const onClose = () => { clientDisconnected = true; };
+  res.on("close", onClose);
+
+  // SSE keepalive: send comment pings to prevent Cloudflare tunnel idle timeout
+  const keepaliveTimer = setInterval(() => {
+    if (!clientDisconnected) {
+      res.write(": keepalive\n\n");
+    }
+  }, KEEPALIVE_INTERVAL_MS);
+
   try {
     // Retry loop: on auth error in first chunk, retry so gateway rotates auth profile
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       const attemptController = new AbortController();
-      const attemptTimeout = setTimeout(() => attemptController.abort(), STREAM_TIMEOUT_MS);
+      // Abort on client disconnect
+      if (clientDisconnected) { attemptController.abort(); break; }
+      const onDisconnect = () => attemptController.abort();
+      res.on("close", onDisconnect);
 
-      const response = await fetch(`${user.gateway_url}/v1/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${user.gateway_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: DEFAULT_MODEL,
-          messages,
-          stream: true,
-          stream_options: { include_usage: true },
-          user: `${userId}-${convId}`,
-        }),
-        signal: attemptController.signal,
-      });
+      // Total stream timeout (covers fetch + entire stream reading)
+      const totalTimeout = setTimeout(() => attemptController.abort(), STREAM_TIMEOUT_MS);
 
-      clearTimeout(attemptTimeout);
+      try {
+        const response = await fetch(`${user.gateway_url}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${user.gateway_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: DEFAULT_MODEL,
+            messages,
+            stream: true,
+            stream_options: { include_usage: true },
+            user: `${userId}-${convId}`,
+          }),
+          signal: attemptController.signal,
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gateway error: ${errorText}`);
-      }
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Gateway error: ${errorText}`);
+        }
 
-      if (!response.body) {
-        throw new Error("No response body");
-      }
+        if (!response.body) {
+          throw new Error("No response body");
+        }
 
-      // Read stream, buffer first delta to detect auth errors before sending to client
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let firstDeltaSent = false;
-      let isAuthError = false;
+        // Read stream with per-chunk timeout to detect stalled connections
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let firstDeltaSent = false;
+        let isAuthError = false;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        while (true) {
+          // Per-chunk timeout: abort if no data for CHUNK_TIMEOUT_MS
+          const chunkResult = await Promise.race([
+            reader.read(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("Chunk timeout")), CHUNK_TIMEOUT_MS),
+            ),
+          ]);
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
+          const { done, value } = chunkResult;
+          if (done) break;
+          if (clientDisconnected) { reader.cancel(); break; }
 
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6).trim();
-            if (data === "[DONE]") continue;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
 
-            try {
-              const chunk = JSON.parse(data);
-              const delta = chunk.choices?.[0]?.delta?.content;
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6).trim();
+              if (data === "[DONE]") continue;
 
-              if (delta) {
-                // Check first delta for auth error before sending anything to client
-                if (!firstDeltaSent && AUTH_ERROR_PATTERN.test(delta)) {
-                  isAuthError = true;
-                  reader.cancel();
-                  break;
+              try {
+                const chunk = JSON.parse(data);
+                const delta = chunk.choices?.[0]?.delta?.content;
+
+                if (delta) {
+                  // Check first delta for auth error before sending anything to client
+                  if (!firstDeltaSent && AUTH_ERROR_PATTERN.test(delta)) {
+                    isAuthError = true;
+                    reader.cancel();
+                    break;
+                  }
+                  firstDeltaSent = true;
+                  fullContent += delta;
+                  if (!clientDisconnected) {
+                    sendSSE(res, "content", { delta, content: fullContent });
+                  }
                 }
-                firstDeltaSent = true;
-                fullContent += delta;
-                sendSSE(res, "content", { delta, content: fullContent });
-              }
 
-              if (chunk.usage) {
-                inputTokens = chunk.usage.prompt_tokens || 0;
-                outputTokens = chunk.usage.completion_tokens || 0;
-                totalTokens = chunk.usage.total_tokens || 0;
-                contextWindow = chunk.usage.context_window || 0;
+                if (chunk.usage) {
+                  inputTokens = chunk.usage.prompt_tokens || 0;
+                  outputTokens = chunk.usage.completion_tokens || 0;
+                  totalTokens = chunk.usage.total_tokens || 0;
+                  contextWindow = chunk.usage.context_window || 0;
+                }
+              } catch {
+                // Skip invalid JSON
               }
-            } catch {
-              // Skip invalid JSON
             }
           }
+          if (isAuthError) break;
         }
-        if (isAuthError) break;
-      }
 
-      // If auth error detected in first chunk, retry
-      if (isAuthError && attempt < MAX_RETRIES - 1) {
-        console.warn(`[chat-stream] Auth error in first chunk (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
-        await new Promise((r) => setTimeout(r, 1000));
-        fullContent = "";
-        inputTokens = 0;
-        outputTokens = 0;
-        totalTokens = 0;
-        contextWindow = 0;
-        continue;
-      }
+        // If auth error detected in first chunk, retry
+        if (isAuthError && attempt < MAX_RETRIES - 1) {
+          console.warn(`[chat-stream] Auth error in first chunk (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+          await new Promise((r) => setTimeout(r, 1000));
+          fullContent = "";
+          inputTokens = 0;
+          outputTokens = 0;
+          totalTokens = 0;
+          contextWindow = 0;
+          continue;
+        }
 
-      if (isAuthError) {
-        console.error(`[chat-stream] All ${MAX_RETRIES} attempts failed with auth error`);
-        sendSSE(res, "error", { error: "All API keys failed. Please check your token vault." });
-        res.end();
-        return;
-      }
+        if (isAuthError) {
+          console.error(`[chat-stream] All ${MAX_RETRIES} attempts failed with auth error`);
+          if (!clientDisconnected) {
+            sendSSE(res, "error", { error: "All API keys failed. Please check your token vault." });
+          }
+          res.end();
+          return;
+        }
 
-      // Success — break retry loop
-      break;
+        // Success — break retry loop
+        break;
+      } finally {
+        clearTimeout(totalTimeout);
+        res.off("close", onDisconnect);
+      }
     }
 
     // Estimate tokens if not provided by gateway
@@ -314,9 +350,13 @@ async function streamMessage(
     });
 
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : "Stream failed";
-    sendSSE(res, "error", { error: errorMsg });
+    if (!clientDisconnected) {
+      const errorMsg = error instanceof Error ? error.message : "Stream failed";
+      sendSSE(res, "error", { error: errorMsg });
+    }
   } finally {
+    clearInterval(keepaliveTimer);
+    res.off("close", onClose);
     res.end();
   }
 }
