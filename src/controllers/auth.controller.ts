@@ -20,6 +20,9 @@ class AuthController {
     const { email, password, name } = req.body as RegisterDTO;
     const meta = { userAgent: req.headers["user-agent"], ip: req.ip };
     const result = await authService.register(email, password, name, meta);
+    // Sync OAuth tokens + push to gateway (register auto-logs in, same as login)
+    syncAuthProfiles(result.user.auth_profiles_path);
+    pushAuthProfilesToGateway(result.user.id);
     res.status(201).json(result);
   }
 
