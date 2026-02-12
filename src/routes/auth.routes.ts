@@ -374,6 +374,18 @@ router.post(
   asyncHandler((req, res) => authController.changePassword(req, res)),
 );
 
+/**
+ * PATCH /auth/gateway
+ * Update gateway config (gateway_url, gateway_token, gateway_hooks_token)
+ * Requires: valid JWT
+ * Called by Electron client after tunnel provision to register local gateway tokens
+ */
+router.patch(
+  "/gateway",
+  authMiddleware,
+  asyncHandler((req, res) => authController.updateGateway(req, res)),
+);
+
 // =============================================================================
 // ADMIN ROUTES - Yêu cầu admin role
 // =============================================================================
