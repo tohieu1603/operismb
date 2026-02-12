@@ -75,6 +75,15 @@ class AuthController {
     const result = await authService.getMe(req.user!.userId);
     res.json(result);
   }
+
+  async updateGateway(req: Request, res: Response): Promise<void> {
+    const { gateway_url, gateway_token } = req.body;
+    const result = await authService.updateGateway(req.user!.userId, {
+      gateway_url,
+      gateway_token,
+    });
+    res.json(result);
+  }
 }
 
 export const authController = new AuthController();

@@ -18,6 +18,7 @@ import {
   gatewayRegisterRoutes,
   analyticsRoutes,
   tokenVaultRoutes,
+  tunnelRoutes,
   productRoutes,
   orderRoutes,
   reviewRoutes,
@@ -45,6 +46,7 @@ operisRouter.use("/v1/gateway", gatewayProxyRoutes);
 operisRouter.use("/analytics", analyticsRoutes);
 operisRouter.use("/token-vault", tokenVaultRoutes);
 operisRouter.use("/gateway", gatewayRegisterRoutes);
+operisRouter.use("/tunnels", tunnelRoutes);
 operisRouter.use("/products", productRoutes);
 operisRouter.use("/orders", orderRoutes);
 operisRouter.use("/", reviewRoutes);
