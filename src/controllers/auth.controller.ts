@@ -77,10 +77,11 @@ class AuthController {
   }
 
   async updateGateway(req: Request, res: Response): Promise<void> {
-    const { gateway_url, gateway_token } = req.body;
+    const { gateway_url, gateway_token, gateway_hooks_token } = req.body;
     const result = await authService.updateGateway(req.user!.userId, {
       gateway_url,
       gateway_token,
+      gateway_hooks_token,
     });
     res.json(result);
   }
