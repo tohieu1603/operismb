@@ -1,21 +1,17 @@
 /**
  * Deposit Routes
  * ==============
- * Nạp tiền và mua token qua chuyển khoản ngân hàng
+ * Thanh toán qua chuyển khoản ngân hàng (SePay)
  *
- * Module này cung cấp:
- * - Xem bảng giá token
- * - Tạo đơn nạp tiền
- * - Theo dõi trạng thái đơn nạp
- * - Lịch sử nạp tiền
- * - Webhook nhận thông báo từ payment gateway
+ * Hỗ trợ 2 loại:
+ * - **token**: Nạp token (prefix OP)
+ * - **order**: Thanh toán đơn hàng (prefix OD)
  *
- * **Flow nạp tiền:**
- * 1. User gọi GET /deposits/pricing xem bảng giá
- * 2. User gọi POST /deposits tạo đơn nạp
- * 3. User chuyển khoản theo thông tin trả về
- * 4. Hệ thống nhận webhook từ SePay
- * 5. Token được cộng tự động
+ * **Flow thanh toán:**
+ * 1. User gọi POST /deposits tạo đơn (truyền type)
+ * 2. User chuyển khoản theo thông tin trả về
+ * 3. Hệ thống nhận webhook từ SePay
+ * 4. Token deposit → cộng token; Order → đánh dấu hoàn thành
  */
 
 import { Router } from "express";
@@ -106,9 +102,9 @@ depositRoutes.get("/pricing", getPricing);
  *
  *       **Xử lý:**
  *       1. Verify signature từ SePay
- *       2. Tìm đơn nạp theo mã giao dịch
- *       3. Cập nhật trạng thái đơn nạp
- *       4. Cộng token cho user nếu thành công
+ *       2. Tìm đơn theo mã giao dịch (prefix OP = token, OD = order)
+ *       3. Cập nhật trạng thái đơn
+ *       4. Cộng token cho user nếu đơn nạp token (OP)
  *
  *     requestBody:
  *       required: true
@@ -174,21 +170,23 @@ depositRoutes.use(authMiddleware);
  * /deposits:
  *   post:
  *     tags: [Deposits]
- *     summary: Tạo đơn nạp tiền
+ *     summary: Tạo đơn thanh toán
  *     description: |
- *       Tạo đơn nạp tiền mới.
+ *       Tạo đơn thanh toán mới. Hỗ trợ 2 loại:
  *
- *       **Flow nạp tiền:**
- *       1. Chọn gói từ bảng giá (hoặc nhập số tiền custom)
- *       2. Gọi endpoint này để tạo đơn
- *       3. Nhận thông tin chuyển khoản (bank, account, amount, content)
- *       4. Chuyển khoản đúng thông tin
- *       5. Token được cộng tự động trong 1-5 phút
+ *       **1. Nạp token (`type: "token"`):**
+ *       - Chọn gói từ bảng giá (`tierId`) hoặc nhập số token (`tokenAmount`)
+ *       - Token được cộng tự động khi thanh toán thành công
+ *
+ *       **2. Thanh toán đơn hàng (`type: "order"`):**
+ *       - Nhập số tiền VND (`amountVnd`)
+ *       - Không cộng token, chỉ đánh dấu đơn hoàn thành
  *
  *       **Lưu ý:**
- *       - Mỗi user chỉ có tối đa 1 đơn pending
- *       - Đơn pending hết hạn sau 24h
+ *       - Mỗi user có tối đa 1 đơn pending **mỗi loại**
+ *       - Đơn pending hết hạn sau 30 phút
  *       - Nội dung chuyển khoản phải ĐÚNG NGUYÊN VĂN
+ *       - Không truyền `type` → mặc định `"token"`
  *
  *     requestBody:
  *       required: true
@@ -197,43 +195,59 @@ depositRoutes.use(authMiddleware);
  *           schema:
  *             type: object
  *             properties:
+ *               type:
+ *                 type: string
+ *                 enum: [token, order]
+ *                 default: token
+ *                 description: Loại thanh toán
  *               tierId:
  *                 type: string
- *                 description: ID gói từ bảng giá
- *               amount:
+ *                 description: ID gói từ bảng giá (chỉ cho type=token)
+ *               tokenAmount:
  *                 type: integer
- *                 description: Số tiền custom (nếu không dùng tier)
+ *                 description: Số token muốn nạp (chỉ cho type=token)
+ *               amountVnd:
+ *                 type: integer
+ *                 description: Số tiền VND (chỉ cho type=order)
  *           examples:
- *             fromTier:
- *               summary: Chọn gói có sẵn
+ *             tokenFromTier:
+ *               summary: Nạp token theo gói
  *               value:
- *                 tierId: "tier_pro"
- *             customAmount:
- *               summary: Số tiền custom
+ *                 type: "token"
+ *                 tierId: "standard"
+ *             tokenCustom:
+ *               summary: Nạp token tùy chọn
  *               value:
- *                 amount: 150000
+ *                 type: "token"
+ *                 tokenAmount: 500000
+ *             orderPayment:
+ *               summary: Thanh toán đơn hàng
+ *               value:
+ *                 type: "order"
+ *                 amountVnd: 15000000
  *
  *     responses:
  *       201:
- *         description: Đơn nạp tiền đã tạo
+ *         description: Đơn thanh toán đã tạo
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/DepositOrder'
  *             example:
- *               id: "dep_abc123"
+ *               id: "uuid-abc123"
+ *               type: "token"
+ *               orderCode: "OP1ABC2DEF"
+ *               tokenAmount: 500000
+ *               amountVnd: 250000
  *               status: "pending"
- *               amount: 200000
- *               tokens: 2200000
  *               paymentInfo:
- *                 bankName: "MB Bank"
- *                 accountNumber: "0123456789"
- *                 accountName: "CONG TY OPERIS"
- *                 amount: 200000
- *                 content: "OPERIS DEP ABC123"
- *               expiresAt: "2024-03-21T15:00:00Z"
+ *                 bankName: "BIDV"
+ *                 accountNumber: "96247CISI1"
+ *                 accountName: "TO TRONG HIEU"
+ *                 transferContent: "OP1ABC2DEF"
+ *                 qrCodeUrl: "https://qr.sepay.vn/img?..."
+ *               expiresAt: "2024-03-20T15:30:00Z"
  *               createdAt: "2024-03-20T15:00:00Z"
- *               note: "Chuyển khoản ĐÚNG số tiền và nội dung"
  *
  *       400:
  *         description: Dữ liệu không hợp lệ
@@ -249,17 +263,6 @@ depositRoutes.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *
- *       409:
- *         description: Đã có đơn pending
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *             example:
- *               error: "Bạn đã có đơn nạp đang chờ thanh toán"
- *               code: "PENDING_ORDER_EXISTS"
- *               pendingOrderId: "dep_xyz789"
- *
  *     security:
  *       - BearerAuth: []
  */
@@ -270,37 +273,34 @@ depositRoutes.post("/", createDeposit);
  * /deposits/pending:
  *   get:
  *     tags: [Deposits]
- *     summary: Đơn nạp đang chờ
+ *     summary: Đơn đang chờ thanh toán
  *     description: |
- *       Lấy đơn nạp tiền đang pending (nếu có).
+ *       Lấy đơn thanh toán đang pending (nếu có).
  *
- *       Mỗi user chỉ có tối đa 1 đơn pending.
+ *       Mỗi user có tối đa 1 đơn pending **mỗi loại** (token / order).
+ *       Truyền `type` để lọc theo loại.
+ *
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [token, order]
+ *         description: Lọc theo loại (không truyền = tất cả)
  *
  *     responses:
  *       200:
- *         description: Đơn nạp pending (hoặc null)
+ *         description: Đơn pending (hoặc null)
  *         content:
  *           application/json:
  *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/DepositOrder'
- *                 - type: object
- *                   properties:
- *                     order:
- *                       type: "null"
- *             example:
- *               id: "dep_abc123"
- *               status: "pending"
- *               amount: 200000
- *               tokens: 2200000
- *               paymentInfo:
- *                 bankName: "MB Bank"
- *                 accountNumber: "0123456789"
- *                 accountName: "CONG TY OPERIS"
- *                 amount: 200000
- *                 content: "OPERIS DEP ABC123"
- *               expiresAt: "2024-03-21T15:00:00Z"
- *               createdAt: "2024-03-20T15:00:00Z"
+ *               type: object
+ *               properties:
+ *                 hasPending:
+ *                   type: boolean
+ *                 order:
+ *                   nullable: true
+ *                   $ref: '#/components/schemas/DepositOrder'
  *
  *       401:
  *         description: Chưa đăng nhập
@@ -384,9 +384,13 @@ depositRoutes.delete("/:id", cancelPendingOrder);
  * /deposits/history:
  *   get:
  *     tags: [Deposits]
- *     summary: Lịch sử nạp tiền
+ *     summary: Lịch sử thanh toán
  *     description: |
- *       Lấy lịch sử các đơn nạp tiền của user.
+ *       Lấy lịch sử các đơn thanh toán của user.
+ *
+ *       **Loại đơn:**
+ *       - `token`: Nạp token
+ *       - `order`: Thanh toán đơn hàng
  *
  *       **Trạng thái đơn:**
  *       - `pending`: Đang chờ thanh toán
@@ -396,11 +400,11 @@ depositRoutes.delete("/:id", cancelPendingOrder);
  *
  *     parameters:
  *       - in: query
- *         name: status
+ *         name: type
  *         schema:
  *           type: string
- *           enum: [pending, completed, cancelled, expired]
- *         description: Filter theo trạng thái
+ *           enum: [token, order]
+ *         description: Lọc theo loại (không truyền = tất cả)
  *
  *       - in: query
  *         name: limit
@@ -421,13 +425,13 @@ depositRoutes.delete("/:id", cancelPendingOrder);
  *
  *     responses:
  *       200:
- *         description: Danh sách đơn nạp
+ *         description: Danh sách đơn thanh toán
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 deposits:
+ *                 orders:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/DepositOrder'

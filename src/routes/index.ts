@@ -15,3 +15,8 @@ export { default as analyticsRoutes } from "./analytics.routes";
 export { default as tokenVaultRoutes } from "./token-vault.routes";
 export { default as gatewayRegisterRoutes } from "./gateway-register.routes";
 export { default as zaloRoutes } from "./zalo.routes";
+export { default as tunnelRoutes } from "./tunnel.routes";
+export { default as productRoutes } from "./product.routes";
+export { default as orderRoutes } from "./order.routes";
+export { default as reviewRoutes } from "./review.routes";
+export { default as questionRoutes } from "./question.routes";

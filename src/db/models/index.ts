@@ -20,6 +20,10 @@ export * as settings from "./settings";
 export * as chatMessages from "./chat-messages";
 export * as tokenUsage from "./token-usage";
 export * as refreshTokens from "./refresh-tokens";
+export * as products from "./products";
+export * as orders from "./orders";
+export * as reviews from "./reviews";
+export * as questions from "./questions";
 
 // Default exports for convenience
 export { default as customersRepo } from "./customers";
@@ -35,3 +39,7 @@ export { default as settingsRepo } from "./settings";
 export { chatMessagesRepo } from "./chat-messages";
 export { default as tokenUsageRepo } from "./token-usage";
 export { default as refreshTokensRepo } from "./refresh-tokens";
+export { default as productsRepo } from "./products";
+export { default as ordersRepo } from "./orders";
+export { default as reviewsRepo } from "./reviews";
+export { default as questionsRepo } from "./questions";

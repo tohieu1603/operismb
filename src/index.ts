@@ -19,6 +19,11 @@ import {
   analyticsRoutes,
   tokenVaultRoutes,
   zaloRoutes,
+  tunnelRoutes,
+  productRoutes,
+  orderRoutes,
+  reviewRoutes,
+  questionRoutes,
 } from "./routes/index";
 import { errorMiddleware } from "./middleware/index";
 
@@ -43,6 +48,11 @@ operisRouter.use("/analytics", analyticsRoutes);
 operisRouter.use("/token-vault", tokenVaultRoutes);
 operisRouter.use("/gateway", gatewayRegisterRoutes);
 operisRouter.use("/zalo", zaloRoutes);
+operisRouter.use("/tunnels", tunnelRoutes);
+operisRouter.use("/products", productRoutes);
+operisRouter.use("/orders", orderRoutes);
+operisRouter.use("/", reviewRoutes);
+operisRouter.use("/", questionRoutes);
 
 // Global error handler - must be last
 operisRouter.use(errorMiddleware);

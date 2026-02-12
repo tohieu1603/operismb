@@ -6,10 +6,13 @@
 import { AppDataSource } from "../data-source";
 import { DepositOrderEntity } from "../entities/deposit-order.entity";
 
+export type DepositType = "token" | "order";
+
 export interface DepositOrder {
   id: string;
   user_id: string;
   order_code: string;
+  type: DepositType;
   token_amount: number;
   amount_vnd: number;
   status: "pending" | "completed" | "failed" | "expired" | "cancelled";
@@ -24,6 +27,7 @@ export interface DepositOrder {
 export interface DepositOrderCreate {
   user_id: string;
   order_code: string;
+  type: DepositType;
   token_amount: number;
   amount_vnd: number;
   expires_at: Date;
@@ -54,10 +58,10 @@ export function calculateTokensFromVnd(vnd: number): number {
 /**
  * Generate unique order code
  */
-export function generateOrderCode(): string {
+export function generateOrderCode(prefix: "OP" | "OD" = "OP"): string {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `OP${timestamp}${random}`;
+  return `${prefix}${timestamp}${random}`;
 }
 
 /**
@@ -107,6 +111,7 @@ export async function getUserDepositOrders(
   userId: string,
   limit = 20,
   offset = 0,
+  type?: DepositType,
 ): Promise<DepositOrder[]> {
   const results = await getRepo().find({
     where: { user_id: userId },
@@ -230,6 +235,7 @@ export async function listAllDeposits(
     id: row.d_id,
     user_id: row.d_user_id,
     order_code: row.d_order_code,
+    type: row.d_type as DepositType,
     token_amount: row.d_token_amount,
     amount_vnd: row.d_amount_vnd,
     status: row.d_status,

@@ -8,7 +8,7 @@ import { depositsRepo, usersRepo } from "../db/index";
 import { AppDataSource } from "../db/data-source";
 import { creditTokensWithClient } from "../db/models/token-transactions";
 import { tokenService } from "./token.service";
-import type { DepositOrder } from "../db/models/deposits";
+import type { DepositOrder, DepositType } from "../db/models/deposits";
 
 // SePay configuration
 const SEPAY_BANK_CODE = process.env.SEPAY_BANK_CODE || "BIDV";
@@ -17,11 +17,14 @@ const SEPAY_ACCOUNT_NAME = process.env.SEPAY_ACCOUNT_NAME || "TO TRONG HIEU";
 const DEPOSIT_EXPIRY_MINUTES = 30; // 30 minutes for bank transfers
 
 export interface CreateDepositInput {
-  tokenAmount: number;
+  type: DepositType;
+  tokenAmount?: number; // Required for type=token
+  amountVnd?: number; // Required for type=order
 }
 
 export interface DepositOrderResponse {
   id: string;
+  type: DepositType;
   orderCode: string;
   tokenAmount: number;
   amountVnd: number;
@@ -56,32 +59,40 @@ class DepositService {
     if (!user) throw Errors.notFound("User");
     if (!user.is_active) throw Errors.accountDeactivated();
 
-    // Validate token amount (minimum 100,000 tokens)
-    if (input.tokenAmount < 100000) {
-      throw Errors.badRequest("Minimum deposit is 100,000 tokens");
+    const isToken = input.type === "token";
+    let tokenAmount: number;
+    let amountVnd: number;
+
+    if (isToken) {
+      if (!input.tokenAmount) throw Errors.badRequest("tokenAmount is required for token deposits");
+      if (input.tokenAmount < 100000) throw Errors.badRequest("Minimum deposit is 100,000 tokens");
+      tokenAmount = input.tokenAmount;
+      amountVnd = depositsRepo.calculateVndFromTokens(tokenAmount);
+    } else {
+      if (!input.amountVnd) throw Errors.badRequest("amountVnd is required for order payments");
+      if (input.amountVnd < 1000) throw Errors.badRequest("Minimum amount is 1,000 VND");
+      tokenAmount = 0;
+      amountVnd = input.amountVnd;
     }
 
-    // Check for existing pending order (prevent spam)
+    // Check for existing pending order of same type (prevent spam)
     const existingOrders = await depositsRepo.getUserDepositOrders(userId, 10, 0);
     const pendingOrder = existingOrders.find(
-      (o) => o.status === "pending" && new Date(o.expires_at) > new Date(),
+      (o) => o.type === input.type && o.status === "pending" && new Date(o.expires_at) > new Date(),
     );
 
     if (pendingOrder) {
-      // Return existing pending order instead of creating new one
       return this.formatDepositResponse(pendingOrder);
     }
 
     // Mark old expired orders
     await depositsRepo.markExpiredOrders();
 
-    // Calculate VND amount
-    const amountVnd = depositsRepo.calculateVndFromTokens(input.tokenAmount);
+    // Generate order code with prefix based on type
+    const prefix = isToken ? "OP" : "OD";
+    const orderCode = depositsRepo.generateOrderCode(prefix);
 
-    // Generate order code
-    const orderCode = depositsRepo.generateOrderCode();
-
-    // Set expiry (10 minutes)
+    // Set expiry
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + DEPOSIT_EXPIRY_MINUTES);
 
@@ -89,7 +100,8 @@ class DepositService {
     const order = await depositsRepo.createDepositOrder({
       user_id: userId,
       order_code: orderCode,
-      token_amount: input.tokenAmount,
+      type: input.type,
+      token_amount: tokenAmount,
       amount_vnd: amountVnd,
       expires_at: expiresAt,
     });
@@ -100,8 +112,8 @@ class DepositService {
   /**
    * Get current pending order for user (for retry payment)
    */
-  async getPendingOrder(userId: string): Promise<DepositOrderResponse | null> {
-    const orders = await depositsRepo.getUserDepositOrders(userId, 1, 0);
+  async getPendingOrder(userId: string, type?: DepositType): Promise<DepositOrderResponse | null> {
+    const orders = await depositsRepo.getUserDepositOrders(userId, 10, 0, type);
     const pendingOrder = orders.find(
       (o) => o.status === "pending" && new Date(o.expires_at) > new Date(),
     );
@@ -143,8 +155,9 @@ class DepositService {
     userId: string,
     limit = 20,
     offset = 0,
+    type?: DepositType,
   ): Promise<{ orders: DepositOrderResponse[]; total: number }> {
-    const orders = await depositsRepo.getUserDepositOrders(userId, limit, offset);
+    const orders = await depositsRepo.getUserDepositOrders(userId, limit, offset, type);
     return {
       orders: orders.map((o) => this.formatDepositResponse(o)),
       total: orders.length,
@@ -186,8 +199,8 @@ class DepositService {
     referenceCode: string;
     transactionDate: string;
   }): Promise<{ success: boolean; orderId?: string }> {
-    // Extract order code from transfer content
-    const orderCodeMatch = data.content.match(/OP[A-Z0-9]+/);
+    // Extract order code from transfer content (OP = token deposit, OD = order payment)
+    const orderCodeMatch = data.content.match(/(OP|OD)[A-Z0-9]+/);
     if (!orderCodeMatch) {
       console.warn("[deposit] Webhook: no order code found in content:", data.content);
       return { success: false };
@@ -253,9 +266,21 @@ class DepositService {
       );
     });
 
-    console.log(
-      `[deposit] Webhook: order ${order.id} completed — ${order.token_amount} tokens credited to user ${order.user_id}`,
-    );
+    const logMsg =
+      order.type === "token"
+        ? `${order.token_amount} tokens credited to user ${order.user_id}`
+        : `order payment ${order.amount_vnd} VND completed for user ${order.user_id}`;
+    console.log(`[deposit] Webhook: order ${order.id} completed — ${logMsg}`);
+
+    // For order payments, update the linked order status
+    if (order.type === "order") {
+      try {
+        const { orderService } = await import("./order.service.js");
+        await orderService.onPaymentCompleted(order.id);
+      } catch (err) {
+        console.error("[deposit] Failed to update order after payment:", err);
+      }
+    }
 
     return { success: true, orderId: order.id };
   }
@@ -305,6 +330,7 @@ class DepositService {
 
     return {
       id: order.id,
+      type: order.type,
       orderCode: order.order_code,
       tokenAmount: order.token_amount,
       amountVnd: order.amount_vnd,

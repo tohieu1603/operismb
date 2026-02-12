@@ -75,6 +75,11 @@ export async function updateUser(id: string, data: UserUpdate): Promise<User | n
   if (data.gateway_hooks_token !== undefined) updateData.gateway_hooks_token = data.gateway_hooks_token;
   if (data.unique_machine !== undefined) updateData.unique_machine = data.unique_machine;
   if (data.auth_profiles_path !== undefined) updateData.auth_profiles_path = data.auth_profiles_path;
+  if (data.cf_tunnel_id !== undefined) updateData.cf_tunnel_id = data.cf_tunnel_id;
+  if (data.cf_tunnel_name !== undefined) updateData.cf_tunnel_name = data.cf_tunnel_name;
+  if (data.cf_tunnel_domain !== undefined) updateData.cf_tunnel_domain = data.cf_tunnel_domain;
+  if (data.cf_dns_record_id !== undefined) updateData.cf_dns_record_id = data.cf_dns_record_id;
+  if (data.cf_provisioned_at !== undefined) updateData.cf_provisioned_at = data.cf_provisioned_at;
 
   if (Object.keys(updateData).length === 0) {
     return getUserById(id);
