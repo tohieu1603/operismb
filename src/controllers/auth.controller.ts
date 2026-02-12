@@ -4,16 +4,16 @@
  */
 
 import type { Request, Response } from "express";
-import { authService } from "../services/auth.service.js";
-import type { RegisterDTO, LoginDTO, ChangePasswordDTO, CreateUserDTO } from "../validators/auth.validator.js";
+import { authService } from "../services/auth.service";
+import type { RegisterDTO, LoginDTO, ChangePasswordDTO, CreateUserDTO } from "../validators/auth.validator";
 import {
   syncAuthProfiles,
   clearAuthProfiles,
   pushAuthProfilesToGateway,
   clearAuthProfilesViaGateway,
-} from "../utils/auth-profiles-sync.util.js";
-import { verifyRefreshToken } from "../utils/jwt.util.js";
-import { getUserById } from "../db/models/users.js";
+} from "../utils/auth-profiles-sync.util";
+import { verifyRefreshToken } from "../utils/jwt.util";
+import { getUserById } from "../db/models/users";
 
 class AuthController {
   async register(req: Request, res: Response): Promise<void> {

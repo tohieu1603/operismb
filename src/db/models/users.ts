@@ -3,9 +3,9 @@
  * CRUD operations for users table (Operis admin users)
  */
 
-import { AppDataSource } from "../data-source.js";
-import { UserEntity } from "../entities/user.entity.js";
-import type { User, UserCreate, UserUpdate } from "./types.js";
+import { AppDataSource } from "../data-source";
+import { UserEntity } from "../entities/user.entity";
+import type { User, UserCreate, UserUpdate } from "./types";
 
 function getRepo() {
   return AppDataSource.getRepository(UserEntity);

@@ -3,11 +3,11 @@
  * CRUD operations for customers table
  */
 
-import { AppDataSource } from "../data-source.js";
-import { CustomerEntity } from "../entities/customer.entity.js";
-import { BoxEntity } from "../entities/box.entity.js";
-import { AgentEntity } from "../entities/agent.entity.js";
-import type { Customer, CustomerCreate, CustomerUpdate } from "./types.js";
+import { AppDataSource } from "../data-source";
+import { CustomerEntity } from "../entities/customer.entity";
+import { BoxEntity } from "../entities/box.entity";
+import { AgentEntity } from "../entities/agent.entity";
+import type { Customer, CustomerCreate, CustomerUpdate } from "./types";
 
 function getRepo() {
   return AppDataSource.getRepository(CustomerEntity);

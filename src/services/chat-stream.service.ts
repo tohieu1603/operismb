@@ -6,10 +6,10 @@
  */
 
 import type { Response } from "express";
-import { Errors } from "../core/errors/api-error.js";
-import { tokenService } from "./token.service.js";
-import { analyticsService } from "./analytics.service.js";
-import { usersRepo, chatMessagesRepo } from "../db/index.js";
+import { Errors } from "../core/errors/api-error";
+import { tokenService } from "./token.service";
+import { analyticsService } from "./analytics.service";
+import { usersRepo, chatMessagesRepo } from "../db/index";
 
 // Config
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";

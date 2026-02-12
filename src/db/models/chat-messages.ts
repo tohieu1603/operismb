@@ -3,8 +3,8 @@
  * CRUD operations for chat history using TypeORM
  */
 
-import { AppDataSource } from "../data-source.js";
-import { ChatMessageEntity } from "../entities/chat-message.entity.js";
+import { AppDataSource } from "../data-source";
+import { ChatMessageEntity } from "../entities/chat-message.entity";
 
 export interface ChatMessage {
   id: string;

@@ -3,9 +3,9 @@
  * Track and query token usage analytics
  */
 
-import { AppDataSource } from "../data-source.js";
-import { TokenUsageEntity } from "../entities/token-usage.entity.js";
-import { UserEntity } from "../entities/user.entity.js";
+import { AppDataSource } from "../data-source";
+import { TokenUsageEntity } from "../entities/token-usage.entity";
+import { UserEntity } from "../entities/user.entity";
 import type {
   TokenUsage,
   TokenUsageCreate,
@@ -13,7 +13,7 @@ import type {
   TokenUsageByType,
   TokenUsageByDate,
   TokenUsageByUser,
-} from "./types.js";
+} from "./types";
 
 const getRepo = () => AppDataSource.getRepository(TokenUsageEntity);
 

@@ -4,34 +4,34 @@
  */
 
 // Types
-export * from "./types.js";
+export * from "./types";
 
 // Repositories
-export * as customers from "./customers.js";
-export * as boxes from "./boxes.js";
-export * as agents from "./agents.js";
-export * as cronjobs from "./cronjobs.js";
-export * as commands from "./commands.js";
-export * as users from "./users.js";
-export * as userApiKeys from "./user-api-keys.js";
-export * as tokenTransactions from "./token-transactions.js";
-export * as deposits from "./deposits.js";
-export * as settings from "./settings.js";
-export * as chatMessages from "./chat-messages.js";
-export * as tokenUsage from "./token-usage.js";
-export * as refreshTokens from "./refresh-tokens.js";
+export * as customers from "./customers";
+export * as boxes from "./boxes";
+export * as agents from "./agents";
+export * as cronjobs from "./cronjobs";
+export * as commands from "./commands";
+export * as users from "./users";
+export * as userApiKeys from "./user-api-keys";
+export * as tokenTransactions from "./token-transactions";
+export * as deposits from "./deposits";
+export * as settings from "./settings";
+export * as chatMessages from "./chat-messages";
+export * as tokenUsage from "./token-usage";
+export * as refreshTokens from "./refresh-tokens";
 
 // Default exports for convenience
-export { default as customersRepo } from "./customers.js";
-export { default as boxesRepo } from "./boxes.js";
-export { default as agentsRepo } from "./agents.js";
-export { default as cronjobsRepo } from "./cronjobs.js";
-export { default as commandsRepo } from "./commands.js";
-export { default as usersRepo } from "./users.js";
-export { default as userApiKeysRepo } from "./user-api-keys.js";
-export { default as tokenTransactionsRepo } from "./token-transactions.js";
-export { default as depositsRepo } from "./deposits.js";
-export { default as settingsRepo } from "./settings.js";
-export { chatMessagesRepo } from "./chat-messages.js";
-export { default as tokenUsageRepo } from "./token-usage.js";
-export { default as refreshTokensRepo } from "./refresh-tokens.js";
+export { default as customersRepo } from "./customers";
+export { default as boxesRepo } from "./boxes";
+export { default as agentsRepo } from "./agents";
+export { default as cronjobsRepo } from "./cronjobs";
+export { default as commandsRepo } from "./commands";
+export { default as usersRepo } from "./users";
+export { default as userApiKeysRepo } from "./user-api-keys";
+export { default as tokenTransactionsRepo } from "./token-transactions";
+export { default as depositsRepo } from "./deposits";
+export { default as settingsRepo } from "./settings";
+export { chatMessagesRepo } from "./chat-messages";
+export { default as tokenUsageRepo } from "./token-usage";
+export { default as refreshTokensRepo } from "./refresh-tokens";

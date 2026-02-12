@@ -12,11 +12,11 @@
  */
 
 import { Router } from "express";
-import { authController } from "../controllers/auth.controller.js";
-import { authMiddleware, optionalAuthMiddleware, adminMiddleware, asyncHandler } from "../middleware/index.js";
-import { validateBody } from "../middleware/validate.middleware.js";
-import { validateRegister, validateLogin, validateRefresh, validateChangePassword, validateCreateUser } from "../validators/auth.validator.js";
-import { loginLimiter, registerLimiter, passwordChangeLimiter } from "../middleware/rate-limit.middleware.js";
+import { authController } from "../controllers/auth.controller";
+import { authMiddleware, optionalAuthMiddleware, adminMiddleware, asyncHandler } from "../middleware/index";
+import { validateBody } from "../middleware/validate.middleware";
+import { validateRegister, validateLogin, validateRefresh, validateChangePassword, validateCreateUser } from "../validators/auth.validator";
+import { loginLimiter, registerLimiter, passwordChangeLimiter } from "../middleware/rate-limit.middleware";
 
 const router = Router();
 

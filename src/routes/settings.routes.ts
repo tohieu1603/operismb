@@ -13,8 +13,8 @@
  */
 
 import { Router } from "express";
-import { getSettings, saveSettings } from "../controllers/settings.controller.js";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware.js";
+import { getSettings, saveSettings } from "../controllers/settings.controller";
+import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
 

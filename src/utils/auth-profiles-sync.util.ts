@@ -11,8 +11,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
-import { settingsRepo } from "../db/models/settings.js";
-import { getUserById, updateUser } from "../db/models/users.js";
+import { settingsRepo } from "../db/models/settings";
+import { getUserById, updateUser } from "../db/models/users";
 
 const SETTINGS_KEY = "anthropic_oauth_tokens";
 const ALGORITHM = "aes-256-gcm";

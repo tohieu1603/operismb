@@ -4,9 +4,9 @@
  */
 
 import { LessThan } from "typeorm";
-import { AppDataSource } from "../data-source.js";
-import { RefreshTokenEntity } from "../entities/refresh-token.entity.js";
-import type { RefreshToken, RefreshTokenCreate } from "./types.js";
+import { AppDataSource } from "../data-source";
+import { RefreshTokenEntity } from "../entities/refresh-token.entity";
+import type { RefreshToken, RefreshTokenCreate } from "./types";
 
 function getRepo() {
   return AppDataSource.getRepository(RefreshTokenEntity);

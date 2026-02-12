@@ -3,9 +3,9 @@
  * CRUD operations for user_api_keys table (TypeORM)
  */
 
-import { AppDataSource } from "../data-source.js";
-import { UserApiKeyEntity } from "../entities/user-api-key.entity.js";
-import type { UserApiKey, UserApiKeyCreate, UserApiKeyUpdate } from "./types.js";
+import { AppDataSource } from "../data-source";
+import { UserApiKeyEntity } from "../entities/user-api-key.entity";
+import type { UserApiKey, UserApiKeyCreate, UserApiKeyUpdate } from "./types";
 
 function getRepo() {
   return AppDataSource.getRepository(UserApiKeyEntity);

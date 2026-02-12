@@ -6,7 +6,7 @@
 
 import crypto from "node:crypto";
 import { Router, type Request, type Response } from "express";
-import { apiKeyService } from "../services/api-key.service.js";
+import { apiKeyService } from "../services/api-key.service";
 
 const router = Router();
 

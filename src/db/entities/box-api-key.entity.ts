@@ -6,7 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { BoxEntity } from './box.entity.js';
+import { BoxEntity } from './box.entity';
 
 @Entity('box_api_keys')
 export class BoxApiKeyEntity {

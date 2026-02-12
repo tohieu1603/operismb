@@ -5,10 +5,10 @@
  */
 
 import { EntityManager } from "typeorm";
-import { AppDataSource } from "../data-source.js";
-import { TokenTransactionEntity } from "../entities/token-transaction.entity.js";
-import { UserEntity } from "../entities/user.entity.js";
-import type { TokenTransaction, TokenTransactionCreate, User } from "./types.js";
+import { AppDataSource } from "../data-source";
+import { TokenTransactionEntity } from "../entities/token-transaction.entity";
+import { UserEntity } from "../entities/user.entity";
+import type { TokenTransaction, TokenTransactionCreate, User } from "./types";
 
 /**
  * Create a new transaction

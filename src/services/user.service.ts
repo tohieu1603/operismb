@@ -2,11 +2,11 @@
  * User Service - User management (admin)
  */
 
-import { usersRepo } from "../db/index.js";
-import { Errors } from "../core/errors/api-error.js";
-import { sanitizeUser, sanitizeUsers } from "../utils/sanitize.util.js";
-import { hashPassword } from "../utils/password.util.js";
-import type { SafeUser } from "../core/types/entities.js";
+import { usersRepo } from "../db/index";
+import { Errors } from "../core/errors/api-error";
+import { sanitizeUser, sanitizeUsers } from "../utils/sanitize.util";
+import { hashPassword } from "../utils/password.util";
+import type { SafeUser } from "../core/types/entities";
 
 export interface PaginatedUsers {
   users: SafeUser[];

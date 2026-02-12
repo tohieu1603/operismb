@@ -8,8 +8,8 @@
  */
 
 import { Router } from "express";
-import { gatewayProxyController } from "../controllers/gateway-proxy.controller.js";
-import { authMiddleware } from "../middleware/auth.middleware.js";
+import { gatewayProxyController } from "../controllers/gateway-proxy.controller";
+import { authMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
 

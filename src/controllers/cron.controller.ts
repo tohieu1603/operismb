@@ -4,7 +4,7 @@
  */
 
 import type { Request, Response } from "express";
-import { cronService } from "../services/cron.service.js";
+import { cronService } from "../services/cron.service";
 
 class CronController {
   /**

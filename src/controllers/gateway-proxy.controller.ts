@@ -4,7 +4,7 @@
  */
 
 import type { Request, Response } from "express";
-import { gatewayProxyService } from "../services/gateway-proxy.service.js";
+import { gatewayProxyService } from "../services/gateway-proxy.service";
 
 // ============================================
 // Controller Functions

@@ -7,7 +7,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { CustomerEntity } from './customer.entity.js';
+import { CustomerEntity } from './customer.entity';
 
 @Entity('boxes')
 export class BoxEntity {

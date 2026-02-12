@@ -5,9 +5,9 @@
 
 import type { Request, Response, NextFunction } from "express";
 import crypto from "node:crypto";
-import { verifyAccessToken, type TokenPayload } from "../utils/jwt.util.js";
-import { userApiKeysRepo } from "../db/index.js";
-import { Errors } from "../core/errors/api-error.js";
+import { verifyAccessToken, type TokenPayload } from "../utils/jwt.util";
+import { userApiKeysRepo } from "../db/index";
+import { Errors } from "../core/errors/api-error";
 
 // Extend Express Request type
 declare global {

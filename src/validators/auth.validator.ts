@@ -2,8 +2,8 @@
  * Auth validators
  */
 
-import type { ValidationResult } from "./common.validator.js";
-import { escapeHtml } from "../utils/sanitize.util.js";
+import type { ValidationResult } from "./common.validator";
+import { escapeHtml } from "../utils/sanitize.util";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;

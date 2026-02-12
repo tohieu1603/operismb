@@ -11,9 +11,9 @@
  * - Log requests
  */
 
-import { Errors } from "../core/errors/api-error.js";
-import { tokenService } from "./token.service.js";
-import { usersRepo } from "../db/index.js";
+import { Errors } from "../core/errors/api-error";
+import { tokenService } from "./token.service";
+import { usersRepo } from "../db/index";
 
 // Config
 const GATEWAY_TIMEOUT_MS = 120_000;

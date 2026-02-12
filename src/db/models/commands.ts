@@ -3,9 +3,9 @@
  * CRUD operations for commands_log table
  */
 
-import { AppDataSource } from "../data-source.js";
-import { CommandLogEntity } from "../entities/command-log.entity.js";
-import type { CommandLog, CommandLogCreate, CommandLogUpdate } from "./types.js";
+import { AppDataSource } from "../data-source";
+import { CommandLogEntity } from "../entities/command-log.entity";
+import type { CommandLog, CommandLogCreate, CommandLogUpdate } from "./types";
 
 // ============================================================================
 // Repository Helper

@@ -4,8 +4,8 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { Errors } from "../core/errors/api-error.js";
-import type { ValidationResult } from "../validators/common.validator.js";
+import { Errors } from "../core/errors/api-error";
+import type { ValidationResult } from "../validators/common.validator";
 
 type ValidatorFn<T> = (data: unknown) => ValidationResult<T>;
 

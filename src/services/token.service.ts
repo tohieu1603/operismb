@@ -2,11 +2,11 @@
  * Token Service - Token balance and transactions
  */
 
-import { usersRepo, tokenTransactionsRepo, tokenUsageRepo } from "../db/index.js";
-import { Errors } from "../core/errors/api-error.js";
-import { sanitizeUser } from "../utils/sanitize.util.js";
-import type { SafeUser, TokenTransaction } from "../core/types/entities.js";
-import type { RequestType } from "../db/models/types.js";
+import { usersRepo, tokenTransactionsRepo, tokenUsageRepo } from "../db/index";
+import { Errors } from "../core/errors/api-error";
+import { sanitizeUser } from "../utils/sanitize.util";
+import type { SafeUser, TokenTransaction } from "../core/types/entities";
+import type { RequestType } from "../db/models/types";
 
 export interface TransactionResult {
   user: SafeUser;

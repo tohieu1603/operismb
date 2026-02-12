@@ -3,12 +3,12 @@
  * Pricing: 1,000,000 tokens = 500,000 VND
  */
 
-import { Errors } from "../core/errors/api-error.js";
-import { depositsRepo, usersRepo } from "../db/index.js";
-import { AppDataSource } from "../db/data-source.js";
-import { creditTokensWithClient } from "../db/models/token-transactions.js";
-import { tokenService } from "./token.service.js";
-import type { DepositOrder } from "../db/models/deposits.js";
+import { Errors } from "../core/errors/api-error";
+import { depositsRepo, usersRepo } from "../db/index";
+import { AppDataSource } from "../db/data-source";
+import { creditTokensWithClient } from "../db/models/token-transactions";
+import { tokenService } from "./token.service";
+import type { DepositOrder } from "../db/models/deposits";
 
 // SePay configuration
 const SEPAY_BANK_CODE = process.env.SEPAY_BANK_CODE || "BIDV";

@@ -4,7 +4,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { ApiError, ErrorCode } from "../core/errors/api-error.js";
+import { ApiError, ErrorCode } from "../core/errors/api-error";
 
 /**
  * Global error handler - converts all errors to generic responses

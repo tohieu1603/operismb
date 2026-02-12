@@ -14,8 +14,8 @@ import {
   getAdminRange,
   getAdminUserStats,
   getAdminHistory,
-} from "../controllers/analytics.controller.js";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware.js";
+} from "../controllers/analytics.controller";
+import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
 
 export const analyticsRoutes = Router();
 

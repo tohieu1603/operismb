@@ -8,9 +8,9 @@
 
 import { Router } from "express";
 import crypto from "node:crypto";
-import { authMiddleware } from "../middleware/auth.middleware.js";
-import { settingsRepo } from "../db/models/settings.js";
-import { Errors } from "../core/errors/api-error.js";
+import { authMiddleware } from "../middleware/auth.middleware";
+import { settingsRepo } from "../db/models/settings";
+import { Errors } from "../core/errors/api-error";
 
 const router = Router();
 

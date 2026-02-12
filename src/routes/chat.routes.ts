@@ -18,9 +18,9 @@
  */
 
 import { Router } from "express";
-import { chatController } from "../controllers/chat.controller.js";
-import { chatStreamController } from "../controllers/chat-stream.controller.js";
-import { authMiddleware, hybridAuthMiddleware, asyncHandler } from "../middleware/index.js";
+import { chatController } from "../controllers/chat.controller";
+import { chatStreamController } from "../controllers/chat-stream.controller";
+import { authMiddleware, hybridAuthMiddleware, asyncHandler } from "../middleware/index";
 
 const router = Router();
 

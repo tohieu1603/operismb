@@ -3,7 +3,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { depositService } from "../services/deposit.service.js";
+import { depositService } from "../services/deposit.service";
 
 /**
  * Get pricing info

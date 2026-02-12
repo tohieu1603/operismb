@@ -6,7 +6,7 @@ import type {
   User,
   UserApiKey,
   TokenTransaction as DbTokenTransaction,
-} from "../../db/models/types.js";
+} from "../../db/models/types";
 
 // Re-export TokenTransaction from db types
 export type TokenTransaction = DbTokenTransaction;

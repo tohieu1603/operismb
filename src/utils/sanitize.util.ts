@@ -3,7 +3,7 @@
  * Single source of truth to avoid code duplication
  */
 
-import type { OperisUser, OperisApiKey, SafeUser, SafeApiKey } from "../core/types/entities.js";
+import type { OperisUser, OperisApiKey, SafeUser, SafeApiKey } from "../core/types/entities";
 
 /**
  * Escape HTML special characters to prevent XSS

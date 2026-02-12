@@ -2,7 +2,7 @@
  * Tool Executor Service Tests
  */
 
-import { toolExecutorService } from "../tool-executor.service.js";
+import { toolExecutorService } from "../tool-executor.service";
 
 describe("ToolExecutorService", () => {
   describe("executeSingleTool", () => {

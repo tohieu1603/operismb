@@ -1,7 +1,7 @@
 /**
  * Database Migration Runner
  */
-import { runMigrations, closePool } from "./connection.js";
+import { runMigrations, closePool } from "./connection";
 
 async function main() {
   console.log("[migrate] Starting migrations...");

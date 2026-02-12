@@ -14,8 +14,8 @@
  */
 
 import { Router } from "express";
-import { userController } from "../controllers/user.controller.js";
-import { authMiddleware, adminMiddleware, asyncHandler } from "../middleware/index.js";
+import { userController } from "../controllers/user.controller";
+import { authMiddleware, adminMiddleware, asyncHandler } from "../middleware/index";
 
 const router = Router();
 

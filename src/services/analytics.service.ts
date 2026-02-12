@@ -3,7 +3,7 @@
  * Token usage analytics and statistics
  */
 
-import { tokenUsageRepo } from "../db/models/index.js";
+import { tokenUsageRepo } from "../db/models/index";
 import type {
   TokenUsageCreate,
   TokenUsageStats,
@@ -11,7 +11,7 @@ import type {
   TokenUsageByDate,
   TokenUsageByUser,
   TokenUsage,
-} from "../db/models/types.js";
+} from "../db/models/types";
 
 // ============================================================================
 // Date Range Helpers

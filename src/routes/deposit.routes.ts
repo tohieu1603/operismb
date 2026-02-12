@@ -30,9 +30,9 @@ import {
   adminUpdateTokens,
   adminGetAllDeposits,
   sepayWebhook,
-} from "../controllers/deposit.controller.js";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware.js";
-import { sepayWebhookMiddleware } from "../middleware/sepay-webhook.middleware.js";
+} from "../controllers/deposit.controller";
+import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { sepayWebhookMiddleware } from "../middleware/sepay-webhook.middleware";
 
 export const depositRoutes = Router();
 
