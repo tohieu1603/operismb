@@ -11,7 +11,7 @@
  *   CLOUDFLARE_BASE_DOMAIN — Base domain (default: operis.vn)
  */
 
-import { updateUser, getUserById } from "../db/models/users.js";
+import { updateUser, getUserById } from "../db/models/users";
 
 const CF_API = "https://api.cloudflare.com/client/v4";
 const GATEWAY_LOCAL_PORT = 18789;

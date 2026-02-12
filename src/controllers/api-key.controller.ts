@@ -4,8 +4,8 @@
  */
 
 import type { Request, Response } from "express";
-import { apiKeyService } from "../services/api-key.service.js";
-import { escapeHtml } from "../utils/sanitize.util.js";
+import { apiKeyService } from "../services/api-key.service";
+import { escapeHtml } from "../utils/sanitize.util";
 
 class ApiKeyController {
   // User's own keys

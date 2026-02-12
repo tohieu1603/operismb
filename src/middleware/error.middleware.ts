@@ -4,7 +4,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { ApiError, ErrorCode } from "../core/errors/api-error.js";
+import { ApiError, ErrorCode } from "../core/errors/api-error";
 
 /**
  * Global error handler - converts all errors to generic responses
@@ -16,8 +16,14 @@ export function errorMiddleware(
   res: Response,
   _next: NextFunction,
 ): void {
-  // Log internal error for debugging
-  console.error("[api] Error:", err);
+  // Log detailed error for debugging
+  console.error(`[api] Error [${err.name}]: ${err.message}`);
+  if (err instanceof ApiError) {
+    console.error(`  → Code: ${err.code} | Status: ${err.statusCode}`);
+  }
+  if (err.stack) {
+    console.error(`  → Stack: ${err.stack.split("\n").slice(1, 4).join("\n")}`);
+  }
 
   // Handle known API errors
   if (err instanceof ApiError) {

@@ -3,15 +3,15 @@
  */
 
 import slugify from "slugify";
-import { Errors } from "../core/errors/api-error.js";
-import { productsRepo } from "../db/index.js";
+import { Errors } from "../core/errors/api-error";
+import { productsRepo } from "../db/index";
 import type {
   Product,
   ProductWithRelations,
   ProductListOptions,
   ProductCreate,
   ProductUpdate,
-} from "../db/models/products.js";
+} from "../db/models/products";
 
 class ProductService {
   async listProducts(opts: ProductListOptions = {}): Promise<{

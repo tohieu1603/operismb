@@ -13,7 +13,7 @@ export {
   closePool,
   checkHealth,
   runMigrations,
-} from "./connection.js";
+} from "./connection";
 
 // Models
-export * from "./models/index.js";
+export * from "./models/index";

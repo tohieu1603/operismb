@@ -3,9 +3,9 @@
  * CRUD operations for agents table
  */
 
-import { AppDataSource } from "../data-source.js";
-import { AgentEntity } from "../entities/agent.entity.js";
-import type { Agent, AgentCreate, AgentUpdate } from "./types.js";
+import { AppDataSource } from "../data-source";
+import { AgentEntity } from "../entities/agent.entity";
+import type { Agent, AgentCreate, AgentUpdate } from "./types";
 
 function getRepo() {
   return AppDataSource.getRepository(AgentEntity);

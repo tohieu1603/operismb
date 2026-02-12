@@ -5,7 +5,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { BoxEntity } from './box.entity.js';
+import { BoxEntity } from './box.entity';
 
 @Entity('commands_log')
 export class CommandLogEntity {

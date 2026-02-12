@@ -14,8 +14,8 @@
  */
 
 import { Router } from "express";
-import { tokenController } from "../controllers/token.controller.js";
-import { authMiddleware, adminMiddleware, asyncHandler } from "../middleware/index.js";
+import { tokenController } from "../controllers/token.controller";
+import { authMiddleware, adminMiddleware, asyncHandler } from "../middleware/index";
 
 const router = Router();
 

@@ -2,9 +2,9 @@
  * Review Service - Product reviews with purchase verification
  */
 
-import { Errors } from "../core/errors/api-error.js";
-import { reviewsRepo, productsRepo, usersRepo } from "../db/index.js";
-import type { Review, ReviewSummary } from "../db/models/reviews.js";
+import { Errors } from "../core/errors/api-error";
+import { reviewsRepo, productsRepo, usersRepo } from "../db/index";
+import type { Review, ReviewSummary } from "../db/models/reviews";
 
 class ReviewService {
   async getProductReviews(

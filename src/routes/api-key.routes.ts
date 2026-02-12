@@ -16,8 +16,8 @@
  */
 
 import { Router } from "express";
-import { apiKeyController } from "../controllers/api-key.controller.js";
-import { authMiddleware, adminMiddleware, asyncHandler } from "../middleware/index.js";
+import { apiKeyController } from "../controllers/api-key.controller";
+import { authMiddleware, adminMiddleware, asyncHandler } from "../middleware/index";
 
 const router = Router();
 

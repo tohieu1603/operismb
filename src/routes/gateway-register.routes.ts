@@ -4,8 +4,8 @@
  */
 
 import { Router } from "express";
-import { asyncHandler } from "../middleware/index.js";
-import { updateUser, getUserByEmail } from "../db/models/users.js";
+import { asyncHandler } from "../middleware/index";
+import { updateUser, getUserByEmail } from "../db/models/users";
 
 const REGISTER_SECRET = process.env.GATEWAY_REGISTER_SECRET || "operis-gateway-register-secret";
 

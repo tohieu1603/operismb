@@ -8,8 +8,9 @@
  */
 
 import { Router } from "express";
-import { gatewayProxyController } from "../controllers/gateway-proxy.controller.js";
-import { authMiddleware } from "../middleware/auth.middleware.js";
+import { gatewayProxyController } from "../controllers/gateway-proxy.controller";
+import { authMiddleware } from "../middleware/auth.middleware";
+import { asyncHandler } from "../middleware/error.middleware";
 
 const router = Router();
 
@@ -243,7 +244,7 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/GatewayError'
  */
-router.get("/health", gatewayProxyController.health);
+router.get("/health", asyncHandler(gatewayProxyController.health));
 
 /**
  * @swagger
@@ -297,7 +298,7 @@ router.get("/health", gatewayProxyController.health);
  *       503:
  *         description: Gateway error hoặc chưa cấu hình
  */
-router.post("/wake", gatewayProxyController.wake);
+router.post("/wake", asyncHandler(gatewayProxyController.wake));
 
 /**
  * @swagger
@@ -370,7 +371,7 @@ router.post("/wake", gatewayProxyController.wake);
  *       503:
  *         description: Gateway error
  */
-router.post("/agent", gatewayProxyController.agent);
+router.post("/agent", asyncHandler(gatewayProxyController.agent));
 
 /**
  * @swagger
@@ -434,7 +435,7 @@ router.post("/agent", gatewayProxyController.agent);
  *       503:
  *         description: Gateway error
  */
-router.post("/hooks/:hookName", gatewayProxyController.customHook);
+router.post("/hooks/:hookName", asyncHandler(gatewayProxyController.customHook));
 
 /**
  * @swagger
@@ -527,7 +528,7 @@ router.post("/hooks/:hookName", gatewayProxyController.customHook);
  *       503:
  *         description: Gateway error
  */
-router.post("/responses", gatewayProxyController.responses);
+router.post("/responses", asyncHandler(gatewayProxyController.responses));
 
 /**
  * @swagger
@@ -584,7 +585,7 @@ router.post("/responses", gatewayProxyController.responses);
  *       503:
  *         description: Gateway error
  */
-router.post("/tools/invoke", gatewayProxyController.invokeTool);
+router.post("/tools/invoke", asyncHandler(gatewayProxyController.invokeTool));
 
 /**
  * @swagger
@@ -718,6 +719,6 @@ router.post("/tools/invoke", gatewayProxyController.invokeTool);
  *       503:
  *         description: Gateway error
  */
-router.post("/chat/completions", gatewayProxyController.chatCompletions);
+router.post("/chat/completions", asyncHandler(gatewayProxyController.chatCompletions));
 
 export default router;

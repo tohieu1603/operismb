@@ -2,17 +2,17 @@
  * Auth Service - Authentication business logic with refresh token rotation
  */
 
-import { usersRepo, refreshTokensRepo } from "../db/index.js";
-import { Errors } from "../core/errors/api-error.js";
-import { sanitizeUser } from "../utils/sanitize.util.js";
-import { hashPassword, verifyPassword } from "../utils/password.util.js";
+import { usersRepo, refreshTokensRepo } from "../db/index";
+import { Errors } from "../core/errors/api-error";
+import { sanitizeUser } from "../utils/sanitize.util";
+import { hashPassword, verifyPassword } from "../utils/password.util";
 import {
   generateTokens,
   verifyRefreshToken,
   hashToken,
   getRefreshTokenExpiryDate,
-} from "../utils/jwt.util.js";
-import type { SafeUser } from "../core/types/entities.js";
+} from "../utils/jwt.util";
+import type { SafeUser } from "../core/types/entities";
 
 export interface AuthResult {
   user: SafeUser;

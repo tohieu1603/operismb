@@ -3,8 +3,8 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { orderService } from "../services/order.service.js";
-import type { OrderStatus } from "../db/models/orders.js";
+import { orderService } from "../services/order.service";
+import type { OrderStatus } from "../db/models/orders";
 
 export async function checkout(req: Request, res: Response, next: NextFunction) {
   try {

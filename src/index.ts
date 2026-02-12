@@ -18,13 +18,14 @@ import {
   gatewayRegisterRoutes,
   analyticsRoutes,
   tokenVaultRoutes,
+  zaloRoutes,
   tunnelRoutes,
   productRoutes,
   orderRoutes,
   reviewRoutes,
   questionRoutes,
-} from "./routes/index.js";
-import { errorMiddleware } from "./middleware/index.js";
+} from "./routes/index";
+import { errorMiddleware } from "./middleware/index";
 
 export const operisRouter = Router();
 
@@ -46,6 +47,7 @@ operisRouter.use("/v1/gateway", gatewayProxyRoutes);
 operisRouter.use("/analytics", analyticsRoutes);
 operisRouter.use("/token-vault", tokenVaultRoutes);
 operisRouter.use("/gateway", gatewayRegisterRoutes);
+operisRouter.use("/zalo", zaloRoutes);
 operisRouter.use("/tunnels", tunnelRoutes);
 operisRouter.use("/products", productRoutes);
 operisRouter.use("/orders", orderRoutes);

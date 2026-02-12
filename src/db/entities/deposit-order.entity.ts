@@ -7,7 +7,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { UserEntity } from './user.entity.js';
+import { UserEntity } from './user.entity';
 
 @Entity('deposit_orders')
 export class DepositOrderEntity {
@@ -23,6 +23,9 @@ export class DepositOrderEntity {
 
   @Column({ type: 'text', nullable: false, unique: true })
   order_code!: string;
+
+  @Column({ type: 'text', nullable: false, default: 'token' })
+  type!: string;
 
   @Column({ type: 'integer', nullable: false })
   token_amount!: number;

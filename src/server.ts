@@ -7,14 +7,14 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import swaggerUi from "swagger-ui-express";
-import { operisRouter } from "./index.js";
-import { allowHostsMiddleware } from "./middleware/allow-hosts.middleware.js";
-import { getPool, runMigrations } from "./db/connection.js";
-import { AppDataSource } from "./db/data-source.js";
-import openaiCompatRoutes from "./routes/openai-compat.routes.js";
-import anthropicCompatRoutes from "./routes/anthropic-compat.routes.js";
-import { cronService } from "./services/cron.service.js";
-import { swaggerSpec } from "./config/swagger.config.js";
+import { operisRouter } from "./index";
+import { allowHostsMiddleware } from "./middleware/allow-hosts.middleware";
+import { getPool, runMigrations } from "./db/connection";
+import { AppDataSource } from "./db/data-source";
+import openaiCompatRoutes from "./routes/openai-compat.routes";
+import anthropicCompatRoutes from "./routes/anthropic-compat.routes";
+import { cronService } from "./services/cron.service";
+import { swaggerSpec } from "./config/swagger.config";
 
 const PORT = parseInt(process.env.PORT || "3025", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -90,4 +90,14 @@ async function main() {
 main().catch((err) => {
   console.error("[server] Failed to start:", err);
   process.exit(1);
+});
+
+// Prevent unhandled errors from crashing the server
+process.on("uncaughtException", (err) => {
+  console.error(`[FATAL] Uncaught Exception: ${err.message}`);
+  console.error(err.stack);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[FATAL] Unhandled Rejection:", reason);
 });

@@ -3,8 +3,8 @@
  * CRUD operations for deposit_orders table
  */
 
-import { AppDataSource } from "../data-source.js";
-import { DepositOrderEntity } from "../entities/deposit-order.entity.js";
+import { AppDataSource } from "../data-source";
+import { DepositOrderEntity } from "../entities/deposit-order.entity";
 
 export type DepositType = "token" | "order";
 

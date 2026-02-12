@@ -4,8 +4,8 @@
  */
 
 import { In } from "typeorm";
-import { AppDataSource } from "../data-source.js";
-import { SettingEntity } from "../entities/setting.entity.js";
+import { AppDataSource } from "../data-source";
+import { SettingEntity } from "../entities/setting.entity";
 
 export interface SystemSetting {
   key: string;

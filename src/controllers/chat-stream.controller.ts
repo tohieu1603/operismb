@@ -4,9 +4,9 @@
  */
 
 import type { Request, Response } from "express";
-import { chatStreamService } from "../services/chat-stream.service.js";
-import { Errors } from "../core/errors/api-error.js";
-import { escapeHtml } from "../utils/sanitize.util.js";
+import { chatStreamService } from "../services/chat-stream.service";
+import { Errors } from "../core/errors/api-error";
+import { escapeHtml } from "../utils/sanitize.util";
 
 class ChatStreamController {
   /**

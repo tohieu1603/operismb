@@ -4,7 +4,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { analyticsService } from "../services/analytics.service.js";
+import { analyticsService } from "../services/analytics.service";
 
 // ============================================================================
 // User Analytics

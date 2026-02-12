@@ -3,7 +3,7 @@
  * CRUD for orders + order_items tables
  */
 
-import { query, queryOne, queryAll } from "../connection.js";
+import { query, queryOne, queryAll } from "../connection";
 import type pg from "pg";
 
 // ── Types ───────────────────────────────────────────────────────────────
