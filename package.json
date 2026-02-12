@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc && cp -r src/db/schema dist/db/",
-    "start": "tsx dist/server.js",
+    "build": "tsc && node scripts/fix-esm-imports.js && cp -r src/db/schema dist/db/",
+    "start": "node dist/server.js",
     "start:dev": "tsx src/server.ts",
     "migrate": "tsx src/db/migrate.ts"
   },

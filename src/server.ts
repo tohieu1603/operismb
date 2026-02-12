@@ -4,6 +4,7 @@
 
 import "reflect-metadata";
 import "dotenv/config";
+import cluster from "node:cluster";
 import express from "express";
 import cors from "cors";
 import swaggerUi from "swagger-ui-express";
@@ -36,6 +37,11 @@ async function main() {
   console.log("[server] Database ready (TypeORM initialized)");
 
   const app = express();
+
+  // Trust 1 proxy layer (Nginx) so Express reads real client IP from X-Forwarded-For
+  // Without this: req.ip = 127.0.0.1 (Nginx IP) → rate-limit counts all users as one
+  // With this:    req.ip = real client IP → rate-limit, logging, allow-hosts work correctly
+  app.set("trust proxy", 2);
 
   // CORS
   app.use(
@@ -82,8 +88,12 @@ async function main() {
   app.listen(PORT, HOST, () => {
     console.log(`[server] Operis API running at http://${HOST}:${PORT}`);
 
-    // Start cron scheduler
-    cronService.startScheduler();
+    // In cluster mode (pm2 -i N), only start cron on worker #1 to avoid duplicate jobs
+    const isPrimary = !cluster.isWorker || cluster.worker?.id === 1;
+    if (isPrimary) {
+      cronService.startScheduler();
+      console.log("[server] Cron scheduler started (primary worker)");
+    }
   });
 }
 
