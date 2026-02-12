@@ -4,6 +4,7 @@
 
 import type { Request, Response, NextFunction } from "express";
 import { depositService } from "../services/deposit.service.js";
+import type { DepositType } from "../db/models/deposits.js";
 
 /**
  * Get pricing info
@@ -23,27 +24,39 @@ export async function getPricing(_req: Request, res: Response, next: NextFunctio
 export async function createDeposit(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user!.userId;
+    const { type = "token", tierId, amountVnd } = req.body;
     let { tokenAmount } = req.body;
-    const { tierId } = req.body;
 
-    // Resolve tierId to tokenAmount if provided
-    if (!tokenAmount && tierId) {
-      const pricing = depositService.getPricingInfo();
-      const pkg = pricing.packages.find((p) => p.id === tierId);
-      if (!pkg) {
-        res.status(400).json({ error: `Invalid tierId: ${tierId}`, code: "BAD_REQUEST" });
+    if (type === "token") {
+      // Resolve tierId to tokenAmount if provided
+      if (!tokenAmount && tierId) {
+        const pricing = depositService.getPricingInfo();
+        const pkg = pricing.packages.find((p) => p.id === tierId);
+        if (!pkg) {
+          res.status(400).json({ error: `Invalid tierId: ${tierId}`, code: "BAD_REQUEST" });
+          return;
+        }
+        tokenAmount = pkg.tokens + pkg.bonus;
+      }
+
+      if (!tokenAmount) {
+        res.status(400).json({ error: "tokenAmount or tierId is required", code: "BAD_REQUEST" });
         return;
       }
-      tokenAmount = pkg.tokens + pkg.bonus;
-    }
 
-    if (!tokenAmount) {
-      res.status(400).json({ error: "tokenAmount or tierId is required", code: "BAD_REQUEST" });
-      return;
-    }
+      const order = await depositService.createDeposit(userId, { type: "token", tokenAmount });
+      res.status(201).json(order);
+    } else if (type === "order") {
+      if (!amountVnd) {
+        res.status(400).json({ error: "amountVnd is required for order payments", code: "BAD_REQUEST" });
+        return;
+      }
 
-    const order = await depositService.createDeposit(userId, { tokenAmount });
-    res.status(201).json(order);
+      const order = await depositService.createDeposit(userId, { type: "order", amountVnd });
+      res.status(201).json(order);
+    } else {
+      res.status(400).json({ error: "Invalid type. Must be 'token' or 'order'", code: "BAD_REQUEST" });
+    }
   } catch (error) {
     next(error);
   }
@@ -70,7 +83,8 @@ export async function getDeposit(req: Request, res: Response, next: NextFunction
 export async function getPendingOrder(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user!.userId;
-    const order = await depositService.getPendingOrder(userId);
+    const type = req.query.type as DepositType | undefined;
+    const order = await depositService.getPendingOrder(userId, type);
 
     if (!order) {
       res.json({ hasPending: false, order: null });
@@ -105,8 +119,9 @@ export async function getDepositHistory(req: Request, res: Response, next: NextF
     const userId = req.user!.userId;
     const limit = parseInt(String(req.query.limit ?? "20"), 10);
     const offset = parseInt(String(req.query.offset ?? "0"), 10);
+    const type = req.query.type as DepositType | undefined;
 
-    const result = await depositService.getDepositHistory(userId, limit, offset);
+    const result = await depositService.getDepositHistory(userId, limit, offset, type);
     res.json(result);
   } catch (error) {
     next(error);

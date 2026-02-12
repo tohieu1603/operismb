@@ -93,7 +93,7 @@ async function getUserTodayStats(userId: string): Promise<PeriodStats> {
     tokenUsageRepo.getUserStats(userId, todayStart, todayEnd),
     tokenUsageRepo.getUserStats(userId, yesterdayStart, todayStart),
     tokenUsageRepo.getUserStatsByType(userId, todayStart, todayEnd),
-    tokenUsageRepo.getUserDailyStats(userId, addDays(todayStart, -7), todayEnd),
+    tokenUsageRepo.getUserDailyStats(userId, todayStart, todayEnd),
   ]);
 
   return { current, previous, byType, daily };
@@ -209,7 +209,7 @@ async function getPlatformTodayStats(): Promise<PlatformPeriodStats> {
     tokenUsageRepo.getPlatformStats(todayStart, todayEnd),
     tokenUsageRepo.getPlatformStats(yesterdayStart, todayStart),
     tokenUsageRepo.getPlatformStatsByType(todayStart, todayEnd),
-    tokenUsageRepo.getPlatformDailyStats(addDays(todayStart, -7), todayEnd),
+    tokenUsageRepo.getPlatformDailyStats(todayStart, todayEnd),
     tokenUsageRepo.getTopUsers(todayStart, todayEnd),
   ]);
 
