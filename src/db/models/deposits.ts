@@ -5,10 +5,13 @@
 
 import { query, queryOne, queryAll } from "../connection.js";
 
+export type DepositType = "token" | "order";
+
 export interface DepositOrder {
   id: string;
   user_id: string;
   order_code: string;
+  type: DepositType;
   token_amount: number;
   amount_vnd: number;
   status: "pending" | "completed" | "failed" | "expired" | "cancelled";
@@ -23,6 +26,7 @@ export interface DepositOrder {
 export interface DepositOrderCreate {
   user_id: string;
   order_code: string;
+  type: DepositType;
   token_amount: number;
   amount_vnd: number;
   expires_at: Date;
@@ -49,10 +53,10 @@ export function calculateTokensFromVnd(vnd: number): number {
 /**
  * Generate unique order code
  */
-export function generateOrderCode(): string {
+export function generateOrderCode(prefix: "OP" | "OD" = "OP"): string {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `OP${timestamp}${random}`;
+  return `${prefix}${timestamp}${random}`;
 }
 
 /**
@@ -61,10 +65,10 @@ export function generateOrderCode(): string {
 export async function createDepositOrder(data: DepositOrderCreate): Promise<DepositOrder> {
   const result = await queryOne<DepositOrder>(
     `INSERT INTO deposit_orders (
-      user_id, order_code, token_amount, amount_vnd, expires_at
-    ) VALUES ($1, $2, $3, $4, $5)
+      user_id, order_code, type, token_amount, amount_vnd, expires_at
+    ) VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING *`,
-    [data.user_id, data.order_code, data.token_amount, data.amount_vnd, data.expires_at],
+    [data.user_id, data.order_code, data.type, data.token_amount, data.amount_vnd, data.expires_at],
   );
 
   if (!result) {
@@ -95,7 +99,17 @@ export async function getUserDepositOrders(
   userId: string,
   limit = 20,
   offset = 0,
+  type?: DepositType,
 ): Promise<DepositOrder[]> {
+  if (type) {
+    return queryAll<DepositOrder>(
+      `SELECT * FROM deposit_orders
+       WHERE user_id = $1 AND type = $2
+       ORDER BY created_at DESC
+       LIMIT $3 OFFSET $4`,
+      [userId, type, limit, offset],
+    );
+  }
   return queryAll<DepositOrder>(
     `SELECT * FROM deposit_orders
      WHERE user_id = $1
