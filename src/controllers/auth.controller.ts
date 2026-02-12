@@ -12,8 +12,19 @@ import {
   pushAuthProfilesToGateway,
   clearAuthProfilesViaGateway,
 } from "../utils/auth-profiles-sync.util";
+import { provisionTunnel, type ProvisionResult } from "../services/cloudflare-tunnel.service";
 import { verifyRefreshToken } from "../utils/jwt.util";
 import { getUserById } from "../db/models/users";
+
+/** Provision CF tunnel, return result or null on failure (never throws) */
+async function safeProvisionTunnel(userId: string, email: string): Promise<ProvisionResult | null> {
+  try {
+    return await provisionTunnel(userId, email);
+  } catch (err: any) {
+    console.error("[auth] Auto-provision tunnel failed:", err.message);
+    return null;
+  }
+}
 
 class AuthController {
   async register(req: Request, res: Response): Promise<void> {
@@ -23,7 +34,9 @@ class AuthController {
     // Sync OAuth tokens + push to gateway (register auto-logs in, same as login)
     syncAuthProfiles(result.user.auth_profiles_path);
     pushAuthProfilesToGateway(result.user.id);
-    res.status(201).json(result);
+    // Auto-provision CF tunnel → return token in response for Electron to start cloudflared
+    const tunnel = await safeProvisionTunnel(result.user.id, email);
+    res.status(201).json({ ...result, tunnel });
   }
 
   async login(req: Request, res: Response): Promise<void> {
@@ -33,7 +46,9 @@ class AuthController {
     // Sync OAuth tokens: local filesystem + push to remote gateway (non-blocking)
     syncAuthProfiles(result.user.auth_profiles_path);
     pushAuthProfilesToGateway(result.user.id);
-    res.json(result);
+    // Auto-provision CF tunnel (idempotent) → return token in response
+    const tunnel = await safeProvisionTunnel(result.user.id, email);
+    res.json({ ...result, tunnel });
   }
 
   async refresh(req: Request, res: Response): Promise<void> {
