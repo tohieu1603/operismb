@@ -18,6 +18,7 @@ import {
   gatewayRegisterRoutes,
   analyticsRoutes,
   tokenVaultRoutes,
+  tunnelRoutes,
 } from "./routes/index.js";
 import { errorMiddleware } from "./middleware/index.js";
 
@@ -41,6 +42,7 @@ operisRouter.use("/v1/gateway", gatewayProxyRoutes);
 operisRouter.use("/analytics", analyticsRoutes);
 operisRouter.use("/token-vault", tokenVaultRoutes);
 operisRouter.use("/gateway", gatewayRegisterRoutes);
+operisRouter.use("/tunnels", tunnelRoutes);
 
 // Global error handler - must be last
 operisRouter.use(errorMiddleware);

@@ -389,6 +389,12 @@ export interface User {
   gateway_token: string | null;
   gateway_hooks_token: string | null; // Separate token for /hooks/* endpoints
   auth_profiles_path: string | null; // Path to OpenClaw auth-profiles.json on user's machine
+  // Cloudflare tunnel auto-provisioning
+  cf_tunnel_id: string | null;
+  cf_tunnel_name: string | null;
+  cf_tunnel_domain: string | null;
+  cf_dns_record_id: string | null;
+  cf_provisioned_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -422,6 +428,11 @@ export interface UserUpdate {
   gateway_token?: string | null;
   gateway_hooks_token?: string | null;
   auth_profiles_path?: string | null;
+  cf_tunnel_id?: string | null;
+  cf_tunnel_name?: string | null;
+  cf_tunnel_domain?: string | null;
+  cf_dns_record_id?: string | null;
+  cf_provisioned_at?: Date | null;
 }
 
 // ============================================================================

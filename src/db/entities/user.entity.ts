@@ -47,6 +47,21 @@ export class UserEntity {
   @Column({ type: 'text', nullable: true })
   auth_profiles_path!: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  cf_tunnel_id!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  cf_tunnel_name!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  cf_tunnel_domain!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  cf_dns_record_id!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  cf_provisioned_at!: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at!: Date;
 
