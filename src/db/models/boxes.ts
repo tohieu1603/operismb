@@ -3,8 +3,22 @@
  * CRUD operations for boxes table (Mini-PC devices)
  */
 
-import { query, queryOne, queryAll } from "../connection.js";
+import { AppDataSource } from "../data-source.js";
+import { BoxEntity } from "../entities/box.entity.js";
+import { BoxApiKeyEntity } from "../entities/box-api-key.entity.js";
 import type { Box, BoxCreate, BoxUpdate, BoxApiKey, BoxApiKeyCreate, BoxStatus } from "./types.js";
+
+// ============================================================================
+// Repository Helpers
+// ============================================================================
+
+function getBoxRepo() {
+  return AppDataSource.getRepository(BoxEntity);
+}
+
+function getApiKeyRepo() {
+  return AppDataSource.getRepository(BoxApiKeyEntity);
+}
 
 // ============================================================================
 // Box CRUD
@@ -14,115 +28,75 @@ import type { Box, BoxCreate, BoxUpdate, BoxApiKey, BoxApiKeyCreate, BoxStatus }
  * Create a new box
  */
 export async function createBox(data: BoxCreate): Promise<Box> {
-  const result = await queryOne<Box>(
-    `INSERT INTO boxes (
-      customer_id, api_key_hash, name, hardware_id,
-      hostname, os, arch, metadata
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    RETURNING *`,
-    [
-      data.customer_id,
-      data.api_key_hash,
-      data.name,
-      data.hardware_id ?? null,
-      data.hostname ?? null,
-      data.os ?? null,
-      data.arch ?? null,
-      JSON.stringify(data.metadata ?? {}),
-    ],
-  );
+  const box = getBoxRepo().create({
+    customer_id: data.customer_id,
+    api_key_hash: data.api_key_hash,
+    name: data.name,
+    hardware_id: data.hardware_id ?? null,
+    hostname: data.hostname ?? null,
+    os: data.os ?? null,
+    arch: data.arch ?? null,
+    metadata: data.metadata ?? {},
+  });
 
-  if (!result) {
-    throw new Error("Failed to create box");
-  }
-
-  return result;
+  const result = await getBoxRepo().save(box);
+  return result as unknown as Box;
 }
 
 /**
  * Get box by ID
  */
 export async function getBoxById(id: string): Promise<Box | null> {
-  return queryOne<Box>("SELECT * FROM boxes WHERE id = $1", [id]);
+  const result = await getBoxRepo().findOneBy({ id });
+  return result as unknown as Box | null;
 }
 
 /**
  * Get box by hardware ID
  */
 export async function getBoxByHardwareId(hardwareId: string): Promise<Box | null> {
-  return queryOne<Box>("SELECT * FROM boxes WHERE hardware_id = $1", [hardwareId]);
+  const result = await getBoxRepo().findOneBy({ hardware_id: hardwareId });
+  return result as unknown as Box | null;
 }
 
 /**
  * Get box by API key hash
  */
 export async function getBoxByApiKeyHash(apiKeyHash: string): Promise<Box | null> {
-  return queryOne<Box>("SELECT * FROM boxes WHERE api_key_hash = $1", [apiKeyHash]);
+  const result = await getBoxRepo().findOneBy({ api_key_hash: apiKeyHash });
+  return result as unknown as Box | null;
 }
 
 /**
  * Update box
  */
 export async function updateBox(id: string, data: BoxUpdate): Promise<Box | null> {
-  const fields: string[] = [];
-  const values: unknown[] = [];
-  let paramIndex = 1;
+  const updateData: Record<string, any> = {};
 
-  if (data.name !== undefined) {
-    fields.push(`name = $${paramIndex++}`);
-    values.push(data.name);
-  }
-  if (data.hostname !== undefined) {
-    fields.push(`hostname = $${paramIndex++}`);
-    values.push(data.hostname);
-  }
-  if (data.os !== undefined) {
-    fields.push(`os = $${paramIndex++}`);
-    values.push(data.os);
-  }
-  if (data.arch !== undefined) {
-    fields.push(`arch = $${paramIndex++}`);
-    values.push(data.arch);
-  }
-  if (data.status !== undefined) {
-    fields.push(`status = $${paramIndex++}`);
-    values.push(data.status);
-  }
-  if (data.last_seen_at !== undefined) {
-    fields.push(`last_seen_at = $${paramIndex++}`);
-    values.push(data.last_seen_at);
-  }
-  if (data.last_ip !== undefined) {
-    fields.push(`last_ip = $${paramIndex++}`);
-    values.push(data.last_ip);
-  }
-  if (data.hardware_id !== undefined) {
-    fields.push(`hardware_id = $${paramIndex++}`);
-    values.push(data.hardware_id);
-  }
-  if (data.metadata !== undefined) {
-    fields.push(`metadata = $${paramIndex++}`);
-    values.push(JSON.stringify(data.metadata));
-  }
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.hostname !== undefined) updateData.hostname = data.hostname;
+  if (data.os !== undefined) updateData.os = data.os;
+  if (data.arch !== undefined) updateData.arch = data.arch;
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.last_seen_at !== undefined) updateData.last_seen_at = data.last_seen_at;
+  if (data.last_ip !== undefined) updateData.last_ip = data.last_ip;
+  if (data.hardware_id !== undefined) updateData.hardware_id = data.hardware_id;
+  if (data.metadata !== undefined) updateData.metadata = data.metadata;
 
-  if (fields.length === 0) {
+  if (Object.keys(updateData).length === 0) {
     return getBoxById(id);
   }
 
-  values.push(id);
-
-  return queryOne<Box>(
-    `UPDATE boxes SET ${fields.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
-    values,
-  );
+  await getBoxRepo().update({ id }, updateData);
+  return getBoxById(id);
 }
 
 /**
  * Delete box
  */
 export async function deleteBox(id: string): Promise<boolean> {
-  const result = await query("DELETE FROM boxes WHERE id = $1", [id]);
-  return (result.rowCount ?? 0) > 0;
+  const result = await getBoxRepo().delete({ id });
+  return (result.affected ?? 0) > 0;
 }
 
 /**
@@ -138,29 +112,24 @@ export async function listBoxesByCustomer(
 ): Promise<{ boxes: Box[]; total: number }> {
   const limit = options?.limit ?? 50;
   const offset = options?.offset ?? 0;
-  const params: unknown[] = [customerId];
 
-  let whereClause = "WHERE customer_id = $1";
+  const queryBuilder = getBoxRepo()
+    .createQueryBuilder("b")
+    .where("b.customer_id = :customerId", { customerId });
+
   if (options?.status) {
-    whereClause += ` AND status = $${params.length + 1}`;
-    params.push(options.status);
+    queryBuilder.andWhere("b.status = :status", { status: options.status });
   }
 
-  const countResult = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM boxes ${whereClause}`,
-    params,
-  );
-
-  const boxes = await queryAll<Box>(
-    `SELECT * FROM boxes ${whereClause}
-     ORDER BY created_at DESC
-     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-    [...params, limit, offset],
-  );
+  const [boxes, total] = await queryBuilder
+    .orderBy("b.created_at", "DESC")
+    .skip(offset)
+    .take(limit)
+    .getManyAndCount();
 
   return {
-    boxes,
-    total: parseInt(countResult?.count ?? "0", 10),
+    boxes: boxes as unknown as Box[],
+    total,
   };
 }
 
@@ -168,10 +137,17 @@ export async function listBoxesByCustomer(
  * Get online boxes for a customer
  */
 export async function getOnlineBoxes(customerId: string): Promise<Box[]> {
-  return queryAll<Box>(
-    "SELECT * FROM boxes WHERE customer_id = $1 AND status = 'online' ORDER BY last_seen_at DESC",
-    [customerId],
-  );
+  const boxes = await getBoxRepo().find({
+    where: {
+      customer_id: customerId,
+      status: "online",
+    },
+    order: {
+      last_seen_at: "DESC",
+    },
+  });
+
+  return boxes as unknown as Box[];
 }
 
 /**
@@ -182,15 +158,18 @@ export async function updateBoxStatus(
   status: BoxStatus,
   ip?: string,
 ): Promise<Box | null> {
-  return queryOne<Box>(
-    `UPDATE boxes SET
-      status = $1,
-      last_seen_at = NOW(),
-      last_ip = COALESCE($2, last_ip)
-     WHERE id = $3
-     RETURNING *`,
-    [status, ip ?? null, id],
-  );
+  await getBoxRepo()
+    .createQueryBuilder()
+    .update(BoxEntity)
+    .set({
+      status,
+      last_seen_at: () => "NOW()",
+      ...(ip ? { last_ip: ip } : {}),
+    })
+    .where("id = :id", { id })
+    .execute();
+
+  return getBoxById(id);
 }
 
 /**
@@ -198,13 +177,15 @@ export async function updateBoxStatus(
  * (boxes not seen in the last X minutes)
  */
 export async function markStaleBoxesOffline(staleMinutes: number = 5): Promise<number> {
-  const result = await query(
-    `UPDATE boxes SET status = 'offline'
-     WHERE status = 'online'
-       AND last_seen_at < NOW() - $1 * INTERVAL '1 minute'`,
-    [staleMinutes],
-  );
-  return result.rowCount ?? 0;
+  const result = await getBoxRepo()
+    .createQueryBuilder()
+    .update(BoxEntity)
+    .set({ status: "offline" })
+    .where("status = :status", { status: "online" })
+    .andWhere(`last_seen_at < NOW() - :minutes * INTERVAL '1 minute'`, { minutes: staleMinutes })
+    .execute();
+
+  return result.affected ?? 0;
 }
 
 // ============================================================================
@@ -215,56 +196,70 @@ export async function markStaleBoxesOffline(staleMinutes: number = 5): Promise<n
  * Create a new API key for a box
  */
 export async function createApiKey(data: BoxApiKeyCreate): Promise<BoxApiKey> {
-  const result = await queryOne<BoxApiKey>(
-    `INSERT INTO box_api_keys (box_id, key_hash, key_prefix, name)
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
-    [data.box_id, data.key_hash, data.key_prefix, data.name ?? "Default"],
-  );
+  const apiKey = getApiKeyRepo().create({
+    box_id: data.box_id,
+    key_hash: data.key_hash,
+    key_prefix: data.key_prefix,
+    name: data.name ?? "Default",
+  });
 
-  if (!result) {
-    throw new Error("Failed to create API key");
-  }
-
-  return result;
+  const result = await getApiKeyRepo().save(apiKey);
+  return result as unknown as BoxApiKey;
 }
 
 /**
  * Get API key by hash
  */
 export async function getApiKeyByHash(keyHash: string): Promise<BoxApiKey | null> {
-  return queryOne<BoxApiKey>(
-    "SELECT * FROM box_api_keys WHERE key_hash = $1 AND is_active = true",
-    [keyHash],
-  );
+  const result = await getApiKeyRepo().findOne({
+    where: {
+      key_hash: keyHash,
+      is_active: true,
+    },
+  });
+
+  return result as unknown as BoxApiKey | null;
 }
 
 /**
  * List API keys for a box
  */
 export async function listApiKeysByBox(boxId: string): Promise<BoxApiKey[]> {
-  return queryAll<BoxApiKey>(
-    "SELECT * FROM box_api_keys WHERE box_id = $1 ORDER BY created_at DESC",
-    [boxId],
-  );
+  const keys = await getApiKeyRepo().find({
+    where: { box_id: boxId },
+    order: { created_at: "DESC" },
+  });
+
+  return keys as unknown as BoxApiKey[];
 }
 
 /**
  * Revoke an API key
  */
 export async function revokeApiKey(id: string): Promise<boolean> {
-  const result = await query(
-    "UPDATE box_api_keys SET is_active = false, revoked_at = NOW() WHERE id = $1",
-    [id],
-  );
-  return (result.rowCount ?? 0) > 0;
+  const result = await getApiKeyRepo()
+    .createQueryBuilder()
+    .update(BoxApiKeyEntity)
+    .set({
+      is_active: false,
+      revoked_at: () => "NOW()",
+    })
+    .where("id = :id", { id })
+    .execute();
+
+  return (result.affected ?? 0) > 0;
 }
 
 /**
  * Update API key last used timestamp
  */
 export async function touchApiKey(id: string): Promise<void> {
-  await query("UPDATE box_api_keys SET last_used_at = NOW() WHERE id = $1", [id]);
+  await getApiKeyRepo()
+    .createQueryBuilder()
+    .update(BoxApiKeyEntity)
+    .set({ last_used_at: () => "NOW()" })
+    .where("id = :id", { id })
+    .execute();
 }
 
 /**
@@ -275,34 +270,31 @@ export async function verifyApiKey(keyHash: string): Promise<{
   box: Box;
   apiKey: BoxApiKey;
 } | null> {
-  const result = await queryOne<Box & { api_key_id: string; api_key_name: string }>(
-    `SELECT b.*, k.id as api_key_id, k.name as api_key_name
-     FROM boxes b
-     INNER JOIN box_api_keys k ON k.box_id = b.id
-     WHERE k.key_hash = $1 AND k.is_active = true`,
-    [keyHash],
-  );
+  const result = await getApiKeyRepo()
+    .createQueryBuilder("k")
+    .innerJoinAndSelect("k.box", "b")
+    .where("k.key_hash = :keyHash AND k.is_active = true", { keyHash })
+    .getOne();
 
   if (!result) {
     return null;
   }
 
   // Touch the API key to update last_used_at
-  await touchApiKey(result.api_key_id);
+  await touchApiKey(result.id);
 
-  const { api_key_id, api_key_name, ...boxData } = result;
   return {
-    box: boxData as Box,
+    box: result.box as unknown as Box,
     apiKey: {
-      id: api_key_id,
-      box_id: boxData.id,
-      key_hash: keyHash,
-      key_prefix: "",
-      name: api_key_name,
-      is_active: true,
+      id: result.id,
+      box_id: result.box_id,
+      key_hash: result.key_hash,
+      key_prefix: result.key_prefix,
+      name: result.name,
+      is_active: result.is_active,
       last_used_at: new Date(),
-      created_at: new Date(),
-      revoked_at: null,
+      created_at: result.created_at,
+      revoked_at: result.revoked_at,
     },
   };
 }

@@ -7,6 +7,7 @@ import type { Request, Response } from "express";
 import { chatService } from "../services/chat.service.js";
 import { chatMessagesRepo } from "../db/index.js";
 import { Errors } from "../core/errors/api-error.js";
+import { escapeHtml } from "../utils/sanitize.util.js";
 
 class ChatController {
   /**
@@ -19,7 +20,7 @@ class ChatController {
       throw Errors.validation("Message is required");
     }
 
-    const result = await chatService.sendMessage(req.user!.userId, message, { conversationId });
+    const result = await chatService.sendMessage(req.user!.userId, escapeHtml(message), { conversationId });
     res.json(result);
   }
 

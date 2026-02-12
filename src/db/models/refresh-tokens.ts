@@ -1,67 +1,62 @@
 /**
  * Refresh Token Repository
- * CRUD operations for refresh_tokens table
+ * CRUD operations for refresh_tokens table (TypeORM)
  */
 
-import { query, queryOne } from "../connection.js";
+import { LessThan } from "typeorm";
+import { AppDataSource } from "../data-source.js";
+import { RefreshTokenEntity } from "../entities/refresh-token.entity.js";
 import type { RefreshToken, RefreshTokenCreate } from "./types.js";
+
+function getRepo() {
+  return AppDataSource.getRepository(RefreshTokenEntity);
+}
 
 /** Create a new refresh token record */
 export async function createRefreshToken(data: RefreshTokenCreate): Promise<RefreshToken> {
-  const result = await queryOne<RefreshToken>(
-    `INSERT INTO refresh_tokens (
-      user_id, token_hash, family, expires_at, user_agent, ip_address
-    ) VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *`,
-    [
-      data.user_id,
-      data.token_hash,
-      data.family,
-      data.expires_at,
-      data.user_agent ?? null,
-      data.ip_address ?? null,
-    ],
-  );
-  if (!result) throw new Error("Failed to create refresh token");
-  return result;
+  const entity = getRepo().create({
+    user_id: data.user_id,
+    token_hash: data.token_hash,
+    family: data.family,
+    expires_at: data.expires_at,
+    user_agent: data.user_agent ?? null,
+    ip_address: data.ip_address ?? null,
+  });
+  const saved = await getRepo().save(entity);
+  return saved as unknown as RefreshToken;
 }
 
 /** Find a refresh token by its hash */
 export async function getByTokenHash(tokenHash: string): Promise<RefreshToken | null> {
-  return queryOne<RefreshToken>(
-    "SELECT * FROM refresh_tokens WHERE token_hash = $1",
-    [tokenHash],
-  );
+  const result = await getRepo().findOneBy({ token_hash: tokenHash });
+  return (result as unknown as RefreshToken) ?? null;
 }
 
 /** Revoke a single refresh token */
 export async function revokeToken(id: string): Promise<void> {
-  await query(
-    "UPDATE refresh_tokens SET is_revoked = true, revoked_at = NOW() WHERE id = $1",
-    [id],
-  );
+  await getRepo().update({ id }, { is_revoked: true, revoked_at: new Date() });
 }
 
 /** Revoke ALL tokens in a family (reuse detection) */
 export async function revokeFamily(family: string): Promise<void> {
-  await query(
-    "UPDATE refresh_tokens SET is_revoked = true, revoked_at = NOW() WHERE family = $1 AND is_revoked = false",
-    [family],
+  await getRepo().update(
+    { family, is_revoked: false },
+    { is_revoked: true, revoked_at: new Date() },
   );
 }
 
 /** Revoke all refresh tokens for a user (password change, deactivation) */
 export async function revokeAllForUser(userId: string): Promise<void> {
-  await query(
-    "UPDATE refresh_tokens SET is_revoked = true, revoked_at = NOW() WHERE user_id = $1 AND is_revoked = false",
-    [userId],
+  await getRepo().update(
+    { user_id: userId, is_revoked: false },
+    { is_revoked: true, revoked_at: new Date() },
   );
 }
 
 /** Delete expired tokens (cleanup) */
 export async function deleteExpired(): Promise<number> {
-  const result = await query("DELETE FROM refresh_tokens WHERE expires_at < NOW()");
-  return result.rowCount ?? 0;
+  const result = await getRepo().delete({ expires_at: LessThan(new Date()) });
+  return result.affected ?? 0;
 }
 
 export default {

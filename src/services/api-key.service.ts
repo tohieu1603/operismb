@@ -47,12 +47,42 @@ class ApiKeyService {
     return { ...sanitizeApiKey(key), key: rawKey };
   }
 
-  async update(id: string, data: Record<string, unknown>): Promise<SafeApiKey> {
-    const key = await userApiKeysRepo.updateApiKey(id, data);
+  /** Allowed fields for API key update (whitelist to prevent mass assignment) */
+  private static ALLOWED_UPDATE_FIELDS = new Set(["name", "permissions", "is_active", "expires_at"]);
+
+  /** Update API key - scoped to user (anti-IDOR) */
+  async updateByUser(id: string, userId: string, data: Record<string, unknown>): Promise<SafeApiKey> {
+    const safeData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (ApiKeyService.ALLOWED_UPDATE_FIELDS.has(key)) {
+        safeData[key] = value;
+      }
+    }
+    const key = await userApiKeysRepo.updateApiKeyByUser(id, userId, safeData);
     if (!key) throw Errors.notFound("API key");
     return sanitizeApiKey(key);
   }
 
+  /** Update API key - admin (no ownership check) */
+  async update(id: string, data: Record<string, unknown>): Promise<SafeApiKey> {
+    const safeData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (ApiKeyService.ALLOWED_UPDATE_FIELDS.has(key)) {
+        safeData[key] = value;
+      }
+    }
+    const key = await userApiKeysRepo.updateApiKey(id, safeData);
+    if (!key) throw Errors.notFound("API key");
+    return sanitizeApiKey(key);
+  }
+
+  /** Delete API key - scoped to user (anti-IDOR) */
+  async deleteByUser(id: string, userId: string): Promise<void> {
+    const deleted = await userApiKeysRepo.deleteApiKeyByUser(id, userId);
+    if (!deleted) throw Errors.notFound("API key");
+  }
+
+  /** Delete API key - admin (no ownership check) */
   async delete(id: string): Promise<void> {
     const deleted = await userApiKeysRepo.deleteApiKey(id);
     if (!deleted) throw Errors.notFound("API key");
@@ -67,11 +97,6 @@ class ApiKeyService {
 
     await userApiKeysRepo.updateLastUsed(key.id);
     return { userId: key.user_id, keyId: key.id };
-  }
-
-  async verifyOwnership(keyId: string, userId: string): Promise<boolean> {
-    const key = await userApiKeysRepo.getApiKeyById(keyId);
-    return key?.user_id === userId;
   }
 }
 

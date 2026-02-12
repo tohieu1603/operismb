@@ -41,7 +41,6 @@ router.put(
     }
 
     const updates: Record<string, string | null> = {};
-    if (gateway_url) updates.gateway_url = gateway_url;
     if (gateway_token) updates.gateway_token = gateway_token;
     if (hooks_token) updates.gateway_hooks_token = hooks_token;
 

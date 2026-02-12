@@ -148,15 +148,12 @@ async function createCronjob(
 }
 
 /**
- * Get cronjob by ID (with ownership check)
+ * Get cronjob by ID (anti-IDOR: query scoped to userId)
  */
 async function getCronjob(userId: string, cronjobId: string): Promise<Cronjob> {
-  const cronjob = await cronjobsRepo.getCronjobById(cronjobId);
+  const cronjob = await cronjobsRepo.getCronjobByIdAndUser(cronjobId, userId);
   if (!cronjob) {
     throw Errors.notFound("Cronjob");
-  }
-  if (cronjob.customer_id !== userId) {
-    throw Errors.forbidden("You don't have access to this cronjob");
   }
   return cronjob;
 }
@@ -215,14 +212,13 @@ async function updateCronjob(
  * Always sends /stop to Moltbot gateway to abort any running agent
  */
 async function deleteCronjob(userId: string, cronjobId: string): Promise<void> {
-  // Check ownership
+  // Anti-IDOR: get scoped to userId (also needed for stop command)
   const cronjob = await getCronjob(userId, cronjobId);
 
   // Always send stop command to abort any running agent before deleting
-  // (even if disabled, there could still be a running agent from previous execution)
   await stopCronjobAgent(cronjob);
 
-  const deleted = await cronjobsRepo.deleteCronjob(cronjobId);
+  const deleted = await cronjobsRepo.deleteCronjobByUser(cronjobId, userId);
   if (!deleted) {
     throw Errors.notFound("Cronjob");
   }

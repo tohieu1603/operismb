@@ -2,6 +2,7 @@
  * Operis API - Standalone Express Server
  */
 
+import "reflect-metadata";
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -9,6 +10,7 @@ import swaggerUi from "swagger-ui-express";
 import { operisRouter } from "./index.js";
 import { allowHostsMiddleware } from "./middleware/allow-hosts.middleware.js";
 import { getPool, runMigrations } from "./db/connection.js";
+import { AppDataSource } from "./db/data-source.js";
 import openaiCompatRoutes from "./routes/openai-compat.routes.js";
 import anthropicCompatRoutes from "./routes/anthropic-compat.routes.js";
 import { cronService } from "./services/cron.service.js";
@@ -28,7 +30,10 @@ async function main() {
   console.log("[server] Initializing database...");
   getPool(); // Initialize pool
   await runMigrations();
-  console.log("[server] Database ready");
+
+  // Initialize TypeORM
+  await AppDataSource.initialize();
+  console.log("[server] Database ready (TypeORM initialized)");
 
   const app = express();
 

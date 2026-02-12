@@ -134,6 +134,16 @@ export async function clearAuthProfiles(userAuthProfilesPath?: string | null): P
 // ============================================
 
 const GATEWAY_PUSH_TIMEOUT_MS = 10_000;
+const REGISTER_SECRET = process.env.GATEWAY_REGISTER_SECRET || "operis-gateway-register-secret";
+// operis-api public URL for gateway callback (gateway → operis-api PUT /gateway/register)
+function getOperisApiUrl(): string {
+  const raw = process.env.OPERIS_API_URL || "http://127.0.0.1:3025";
+  // Auto-add https:// if user forgot the protocol
+  if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
+    return `https://${raw}`;
+  }
+  return raw;
+}
 
 /** Build auth-profiles JSON from vault tokens */
 async function buildAuthProfilesJson(): Promise<{
@@ -229,21 +239,27 @@ function readLocalGatewayConfig(): { gatewayUrl: string; gatewayToken: string; h
  */
 export async function pushAuthProfilesToGateway(userId: string): Promise<void> {
   try {
-    // Step 1: Read local openclaw.json and update DB with fresh gateway tokens
-    const gwConfig = readLocalGatewayConfig();
-    if (gwConfig) {
-      await updateUser(userId, {
-        gateway_url: gwConfig.gatewayUrl,
-        gateway_token: gwConfig.gatewayToken,
-        gateway_hooks_token: gwConfig.hooksToken,
-      });
-      console.log(`[auth-sync] Updated gateway config from openclaw.json → ${gwConfig.gatewayUrl}`);
+    // Step 1: Check if user already has a remote gateway configured
+    const user = await getUserById(userId);
+
+    // Only read local openclaw.json if user has NO gateway_url in DB (co-located setup)
+    // Remote users already have their own gateway_url — don't overwrite with local config
+    if (!user?.gateway_url) {
+      const gwConfig = readLocalGatewayConfig();
+      if (gwConfig) {
+        await updateUser(userId, {
+          gateway_url: gwConfig.gatewayUrl,
+          gateway_token: gwConfig.gatewayToken,
+          gateway_hooks_token: gwConfig.hooksToken,
+        });
+        console.log(`[auth-sync] Updated gateway config from local openclaw.json → ${gwConfig.gatewayUrl}`);
+      }
     }
 
-    // Step 2: Re-read user (with updated tokens) and push auth-profiles
-    const user = await getUserById(userId);
-    const hooksToken = user?.gateway_hooks_token || user?.gateway_token;
-    if (!user?.gateway_url || !hooksToken) {
+    // Step 2: Re-read user (with possibly updated tokens) and push auth-profiles
+    const freshUser = await getUserById(userId);
+    const hooksToken = freshUser?.gateway_hooks_token || freshUser?.gateway_token;
+    if (!freshUser?.gateway_url || !hooksToken) {
       console.log("[auth-sync] No gateway configured for user, skipping push");
       return;
     }
@@ -254,15 +270,22 @@ export async function pushAuthProfilesToGateway(userId: string): Promise<void> {
       return;
     }
 
+    // Include callback so gateway calls back PUT /gateway/register with its real token
+    const callback = {
+      url: `${getOperisApiUrl()}/api/gateway/register`,
+      email: freshUser.email,
+      secret: REGISTER_SECRET,
+    };
+
     const ok = await callGatewayHook(
-      user.gateway_url,
+      freshUser.gateway_url,
       hooksToken,
       "sync-auth-profiles",
-      { authProfiles },
+      { authProfiles, callback },
     );
 
     if (ok) {
-      console.log(`[auth-sync] Pushed ${Object.keys(authProfiles.profiles).length} profile(s) to gateway`);
+      console.log(`[auth-sync] Pushed ${Object.keys(authProfiles.profiles).length} profile(s) to gateway (with callback)`);
     }
   } catch (err) {
     console.error("[auth-sync] pushAuthProfilesToGateway failed:", err);

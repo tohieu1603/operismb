@@ -6,6 +6,7 @@
 import type { Request, Response } from "express";
 import { chatStreamService } from "../services/chat-stream.service.js";
 import { Errors } from "../core/errors/api-error.js";
+import { escapeHtml } from "../utils/sanitize.util.js";
 
 class ChatStreamController {
   /**
@@ -24,7 +25,7 @@ class ChatStreamController {
     }
 
     // Stream handles its own response via SSE
-    await chatStreamService.streamMessage(req.user!.userId, message, res, {
+    await chatStreamService.streamMessage(req.user!.userId, escapeHtml(message), res, {
       conversationId,
     });
   }

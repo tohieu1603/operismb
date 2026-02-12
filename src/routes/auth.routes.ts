@@ -13,9 +13,10 @@
 
 import { Router } from "express";
 import { authController } from "../controllers/auth.controller.js";
-import { authMiddleware, optionalAuthMiddleware, asyncHandler } from "../middleware/index.js";
+import { authMiddleware, optionalAuthMiddleware, adminMiddleware, asyncHandler } from "../middleware/index.js";
 import { validateBody } from "../middleware/validate.middleware.js";
-import { validateRegister, validateLogin, validateRefresh } from "../validators/auth.validator.js";
+import { validateRegister, validateLogin, validateRefresh, validateChangePassword, validateCreateUser } from "../validators/auth.validator.js";
+import { loginLimiter, registerLimiter, passwordChangeLimiter } from "../middleware/rate-limit.middleware.js";
 
 const router = Router();
 
@@ -100,6 +101,7 @@ const router = Router();
  */
 router.post(
   "/register",
+  registerLimiter,
   validateBody(validateRegister),
   asyncHandler((req, res) => authController.register(req, res)),
 );
@@ -188,6 +190,7 @@ router.post(
  */
 router.post(
   "/login",
+  loginLimiter,
   validateBody(validateLogin),
   asyncHandler((req, res) => authController.login(req, res)),
 );
@@ -355,6 +358,38 @@ router.get(
   "/me",
   authMiddleware,
   asyncHandler((req, res) => authController.getMe(req, res)),
+);
+
+/**
+ * POST /auth/change-password
+ * Change password for the current user
+ * Requires: valid JWT
+ * Body: { currentPassword, newPassword }
+ */
+router.post(
+  "/change-password",
+  passwordChangeLimiter,
+  authMiddleware,
+  validateBody(validateChangePassword),
+  asyncHandler((req, res) => authController.changePassword(req, res)),
+);
+
+// =============================================================================
+// ADMIN ROUTES - Yêu cầu admin role
+// =============================================================================
+
+/**
+ * POST /auth/users
+ * Admin: create a new user account
+ * Requires: admin JWT
+ * Body: { email, password, name, role?, token_balance?, unique_machine? }
+ */
+router.post(
+  "/users",
+  authMiddleware,
+  adminMiddleware,
+  validateBody(validateCreateUser),
+  asyncHandler((req, res) => authController.createUser(req, res)),
 );
 
 export default router;

@@ -5,7 +5,7 @@
 
 import type { Request, Response } from "express";
 import { authService } from "../services/auth.service.js";
-import type { RegisterDTO, LoginDTO } from "../validators/auth.validator.js";
+import type { RegisterDTO, LoginDTO, ChangePasswordDTO, CreateUserDTO } from "../validators/auth.validator.js";
 import {
   syncAuthProfiles,
   clearAuthProfiles,
@@ -57,6 +57,18 @@ class AuthController {
     }
     clearAuthProfiles(authProfilesPath);
     res.json({ success: true });
+  }
+
+  async changePassword(req: Request, res: Response): Promise<void> {
+    const { currentPassword, newPassword } = req.body as ChangePasswordDTO;
+    await authService.changePassword(req.user!.userId, currentPassword, newPassword);
+    res.json({ success: true });
+  }
+
+  async createUser(req: Request, res: Response): Promise<void> {
+    const data = req.body as CreateUserDTO;
+    const user = await authService.createUserByAdmin(data);
+    res.status(201).json(user);
   }
 
   async getMe(req: Request, res: Response): Promise<void> {

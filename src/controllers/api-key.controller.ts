@@ -5,7 +5,7 @@
 
 import type { Request, Response } from "express";
 import { apiKeyService } from "../services/api-key.service.js";
-import { Errors } from "../core/errors/api-error.js";
+import { escapeHtml } from "../utils/sanitize.util.js";
 
 class ApiKeyController {
   // User's own keys
@@ -19,7 +19,7 @@ class ApiKeyController {
     const expiresAt = expires_at ? new Date(expires_at) : undefined;
     const result = await apiKeyService.create(
       req.user!.userId,
-      name || "Default",
+      escapeHtml(name || "Default"),
       permissions,
       expiresAt,
     );
@@ -28,25 +28,15 @@ class ApiKeyController {
 
   async update(req: Request, res: Response): Promise<void> {
     const id = req.params.id as string;
-    // Verify ownership
-    const isOwner = await apiKeyService.verifyOwnership(id, req.user!.userId);
-    if (!isOwner) {
-      throw Errors.notFound("API key");
-    }
-
-    const result = await apiKeyService.update(id, req.body);
+    // Anti-IDOR: query scoped to userId (no separate ownership check)
+    const result = await apiKeyService.updateByUser(id, req.user!.userId, req.body);
     res.json(result);
   }
 
   async delete(req: Request, res: Response): Promise<void> {
     const id = req.params.id as string;
-    // Verify ownership
-    const isOwner = await apiKeyService.verifyOwnership(id, req.user!.userId);
-    if (!isOwner) {
-      throw Errors.notFound("API key");
-    }
-
-    await apiKeyService.delete(id);
+    // Anti-IDOR: delete scoped to userId
+    await apiKeyService.deleteByUser(id, req.user!.userId);
     res.json({ success: true });
   }
 
