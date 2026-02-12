@@ -14,6 +14,7 @@ export { default as gatewayProxyRoutes } from "./gateway-proxy.routes.js";
 export { default as analyticsRoutes } from "./analytics.routes.js";
 export { default as tokenVaultRoutes } from "./token-vault.routes.js";
 export { default as gatewayRegisterRoutes } from "./gateway-register.routes.js";
+export { default as tunnelRoutes } from "./tunnel.routes.js";
 export { default as productRoutes } from "./product.routes.js";
 export { default as orderRoutes } from "./order.routes.js";
 export { default as reviewRoutes } from "./review.routes.js";
