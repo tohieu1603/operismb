@@ -12,6 +12,7 @@ import {
   checkPurchase,
 } from "../controllers/review.controller";
 import { authMiddleware } from "../middleware/auth.middleware";
+import { asyncHandler } from "../middleware/error.middleware";
 
 export const reviewRoutes = Router();
 
@@ -40,7 +41,7 @@ export const reviewRoutes = Router();
  *         description: reviews + summary (average, total, distribution)
  *     security: []
  */
-reviewRoutes.get("/products/:slug/reviews", getProductReviews);
+reviewRoutes.get("/products/:slug/reviews", asyncHandler(getProductReviews));
 
 /**
  * @swagger
@@ -72,7 +73,7 @@ reviewRoutes.get("/products/:slug/reviews", getProductReviews);
  *       409:
  *         description: Đã đánh giá rồi
  */
-reviewRoutes.post("/products/:slug/reviews", authMiddleware, createReview);
+reviewRoutes.post("/products/:slug/reviews", authMiddleware, asyncHandler(createReview));
 
 /**
  * @swagger
@@ -91,7 +92,7 @@ reviewRoutes.post("/products/:slug/reviews", authMiddleware, createReview);
  *       200:
  *         description: "{ purchased: boolean }"
  */
-reviewRoutes.get("/products/:slug/check-purchase", authMiddleware, checkPurchase);
+reviewRoutes.get("/products/:slug/check-purchase", authMiddleware, asyncHandler(checkPurchase));
 
 /**
  * @swagger
@@ -112,6 +113,6 @@ reviewRoutes.get("/products/:slug/check-purchase", authMiddleware, checkPurchase
  *       404:
  *         description: Không tìm thấy review
  */
-reviewRoutes.post("/reviews/:id/helpful", authMiddleware, markHelpful);
+reviewRoutes.post("/reviews/:id/helpful", authMiddleware, asyncHandler(markHelpful));
 
 export default reviewRoutes;

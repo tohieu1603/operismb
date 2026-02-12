@@ -9,6 +9,7 @@ import crypto from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import { chatService } from "../services/chat.service";
 import { apiKeyService } from "../services/api-key.service";
+import { asyncHandler } from "../middleware/error.middleware";
 
 const router = Router();
 
@@ -111,7 +112,7 @@ function sendSSE(res: Response, data: unknown): void {
  * POST /v1/chat/completions
  * OpenAI-compatible chat completions endpoint
  */
-router.post("/chat/completions", async (req: Request, res: Response) => {
+router.post("/chat/completions", asyncHandler(async (req: Request, res: Response) => {
   console.log("[openai-compat] Request received, stream:", req.body?.stream);
 
   try {
@@ -381,13 +382,13 @@ router.post("/chat/completions", async (req: Request, res: Response) => {
       },
     });
   }
-});
+}));
 
 /**
  * GET /v1/models
  * List available models
  */
-router.get("/models", async (_req: Request, res: Response) => {
+router.get("/models", asyncHandler(async (_req: Request, res: Response) => {
   res.json({
     object: "list",
     data: [
@@ -399,6 +400,6 @@ router.get("/models", async (_req: Request, res: Response) => {
       },
     ],
   });
-});
+}));
 
 export default router;

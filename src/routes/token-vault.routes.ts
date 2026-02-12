@@ -11,6 +11,7 @@ import crypto from "node:crypto";
 import { authMiddleware } from "../middleware/auth.middleware";
 import { settingsRepo } from "../db/models/settings";
 import { Errors } from "../core/errors/api-error";
+import { asyncHandler } from "../middleware/error.middleware";
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.use(authMiddleware);
  * Body: { tokens: ["sk-ant-...", "sk-ant-...", ...] }
  * Also accepts legacy { token: "sk-ant-..." } for single token
  */
-router.put("/", async (req, res, next) => {
+router.put("/", asyncHandler(async (req, res, next) => {
   try {
     const { tokens, token } = req.body;
 
@@ -75,12 +76,12 @@ router.put("/", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * GET / — Pull tokens (any authenticated user)
  */
-router.get("/", async (_req, res, next) => {
+router.get("/", asyncHandler(async (_req, res, next) => {
   try {
     const raw = await settingsRepo.getSetting(SETTINGS_KEY);
     if (!raw) {
@@ -93,13 +94,13 @@ router.get("/", async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * GET /auth-profiles — Returns auth-profiles.json content ready to write to file
  * Client-side script calls this endpoint and saves response directly
  */
-router.get("/auth-profiles", async (_req, res, next) => {
+router.get("/auth-profiles", asyncHandler(async (_req, res, next) => {
   try {
     const raw = await settingsRepo.getSetting(SETTINGS_KEY);
     if (!raw) {
@@ -121,19 +122,19 @@ router.get("/auth-profiles", async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * DELETE / — Remove stored token (admin only)
  */
-router.delete("/", async (_req, res, next) => {
+router.delete("/", asyncHandler(async (_req, res, next) => {
   try {
     await settingsRepo.deleteSetting(SETTINGS_KEY);
     res.json({ success: true, message: "Token removed" });
   } catch (err) {
     next(err);
   }
-});
+}));
 
 export const tokenVaultRoutes = router;
 export default router;

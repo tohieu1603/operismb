@@ -11,6 +11,7 @@ import {
   answerQuestion,
 } from "../controllers/question.controller";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { asyncHandler } from "../middleware/error.middleware";
 
 export const questionRoutes = Router();
 
@@ -36,7 +37,7 @@ export const questionRoutes = Router();
  *         description: questions + answers
  *     security: []
  */
-questionRoutes.get("/products/:slug/questions", getProductQuestions);
+questionRoutes.get("/products/:slug/questions", asyncHandler(getProductQuestions));
 
 /**
  * @swagger
@@ -66,7 +67,7 @@ questionRoutes.get("/products/:slug/questions", getProductQuestions);
  *       404:
  *         description: Sản phẩm không tồn tại
  */
-questionRoutes.post("/products/:slug/questions", authMiddleware, askQuestion);
+questionRoutes.post("/products/:slug/questions", authMiddleware, asyncHandler(askQuestion));
 
 /**
  * @swagger
@@ -96,6 +97,6 @@ questionRoutes.post("/products/:slug/questions", authMiddleware, askQuestion);
  *       404:
  *         description: Không tìm thấy câu hỏi
  */
-questionRoutes.patch("/questions/:id/answer", authMiddleware, adminMiddleware, answerQuestion);
+questionRoutes.patch("/questions/:id/answer", authMiddleware, adminMiddleware, asyncHandler(answerQuestion));
 
 export default questionRoutes;

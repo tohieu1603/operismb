@@ -15,6 +15,7 @@
 import { Router } from "express";
 import { getSettings, saveSettings } from "../controllers/settings.controller";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { asyncHandler } from "../middleware/error.middleware";
 
 const router = Router();
 
@@ -103,7 +104,7 @@ const router = Router();
  *     security:
  *       - BearerAuth: []
  */
-router.get("/", authMiddleware, adminMiddleware, getSettings);
+router.get("/", authMiddleware, adminMiddleware, asyncHandler(getSettings));
 
 /**
  * @swagger
@@ -231,7 +232,7 @@ router.get("/", authMiddleware, adminMiddleware, getSettings);
  *     security:
  *       - BearerAuth: []
  */
-router.post("/", authMiddleware, adminMiddleware, saveSettings);
+router.post("/", authMiddleware, adminMiddleware, asyncHandler(saveSettings));
 
 export const settingsRoutes = router;
 export default router;

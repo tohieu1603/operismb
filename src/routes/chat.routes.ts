@@ -263,7 +263,7 @@ router.post(
   asyncHandler(async (req, res, next) => {
     await hybridAuthMiddleware(req, res, next);
   }),
-  (req, res) => chatStreamController.streamMessage(req, res),
+  asyncHandler((req, res) => chatStreamController.streamMessage(req, res)),
 );
 
 // =============================================================================

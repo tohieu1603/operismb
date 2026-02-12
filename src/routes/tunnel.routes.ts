@@ -14,6 +14,7 @@ import {
   deprovisionTunnel,
   getTunnelStatus,
 } from "../services/cloudflare-tunnel.service";
+import { asyncHandler } from "../middleware/error.middleware";
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.use(authMiddleware);
  * POST /provision — Auto-provision a Cloudflare tunnel for the authenticated user.
  * Idempotent: returns existing tunnel if already provisioned.
  */
-router.post("/provision", async (req, res, next) => {
+router.post("/provision", asyncHandler(async (req, res, next) => {
   try {
     const userId = req.user!.userId;
     const email = req.user!.email;
@@ -40,12 +41,12 @@ router.post("/provision", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * DELETE /deprovision — Remove the user's tunnel and DNS record.
  */
-router.delete("/deprovision", async (req, res, next) => {
+router.delete("/deprovision", asyncHandler(async (req, res, next) => {
   try {
     const userId = req.user!.userId;
     await deprovisionTunnel(userId);
@@ -53,12 +54,12 @@ router.delete("/deprovision", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * GET /status — Get current tunnel info for the authenticated user.
  */
-router.get("/status", async (req, res, next) => {
+router.get("/status", asyncHandler(async (req, res, next) => {
   try {
     const userId = req.user!.userId;
     const status = await getTunnelStatus(userId);
@@ -66,7 +67,7 @@ router.get("/status", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 export const tunnelRoutes = router;
 export default router;

@@ -100,7 +100,7 @@ async function streamMessage(
   if (!user.is_active) throw Errors.accountDeactivated();
 
   if (!user.gateway_url || !user.gateway_token) {
-    throw Errors.serviceUnavailable("Gateway not configured");
+    throw Errors.serviceUnavailable("Gateway");
   }
 
   const convId = options?.conversationId || generateConversationId();

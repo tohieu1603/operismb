@@ -16,6 +16,7 @@ import {
   getAdminHistory,
 } from "../controllers/analytics.controller";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { asyncHandler } from "../middleware/error.middleware";
 
 export const analyticsRoutes = Router();
 
@@ -76,7 +77,7 @@ analyticsRoutes.use(authMiddleware);
  *     security:
  *       - BearerAuth: []
  */
-analyticsRoutes.get("/usage", getUserUsage);
+analyticsRoutes.get("/usage", asyncHandler(getUserUsage));
 
 /**
  * @swagger
@@ -103,7 +104,7 @@ analyticsRoutes.get("/usage", getUserUsage);
  *     security:
  *       - BearerAuth: []
  */
-analyticsRoutes.get("/usage/daily", getUserDaily);
+analyticsRoutes.get("/usage/daily", asyncHandler(getUserDaily));
 
 /**
  * @swagger
@@ -140,7 +141,7 @@ analyticsRoutes.get("/usage/daily", getUserDaily);
  *     security:
  *       - BearerAuth: []
  */
-analyticsRoutes.get("/usage/range", getUserRange);
+analyticsRoutes.get("/usage/range", asyncHandler(getUserRange));
 
 /**
  * @swagger
@@ -188,7 +189,7 @@ analyticsRoutes.get("/usage/range", getUserRange);
  *     security:
  *       - BearerAuth: []
  */
-analyticsRoutes.get("/usage/history", getUserHistory);
+analyticsRoutes.get("/usage/history", asyncHandler(getUserHistory));
 
 // =============================================================================
 // ADMIN ANALYTICS ENDPOINTS
@@ -243,7 +244,7 @@ analyticsRoutes.get("/usage/history", getUserHistory);
  *     security:
  *       - BearerAuth: []
  */
-analyticsRoutes.get("/admin/overview", adminMiddleware, getAdminOverview);
+analyticsRoutes.get("/admin/overview", adminMiddleware, asyncHandler(getAdminOverview));
 
 /**
  * @swagger
@@ -269,7 +270,7 @@ analyticsRoutes.get("/admin/overview", adminMiddleware, getAdminOverview);
  *     security:
  *       - BearerAuth: []
  */
-analyticsRoutes.get("/admin/daily", adminMiddleware, getAdminDaily);
+analyticsRoutes.get("/admin/daily", adminMiddleware, asyncHandler(getAdminDaily));
 
 /**
  * @swagger
@@ -301,7 +302,7 @@ analyticsRoutes.get("/admin/daily", adminMiddleware, getAdminDaily);
  *     security:
  *       - BearerAuth: []
  */
-analyticsRoutes.get("/admin/range", adminMiddleware, getAdminRange);
+analyticsRoutes.get("/admin/range", adminMiddleware, asyncHandler(getAdminRange));
 
 /**
  * @swagger
@@ -333,7 +334,7 @@ analyticsRoutes.get("/admin/range", adminMiddleware, getAdminRange);
  *     security:
  *       - BearerAuth: []
  */
-analyticsRoutes.get("/admin/users/:userId", adminMiddleware, getAdminUserStats);
+analyticsRoutes.get("/admin/users/:userId", adminMiddleware, asyncHandler(getAdminUserStats));
 
 /**
  * @swagger
@@ -390,6 +391,6 @@ analyticsRoutes.get("/admin/users/:userId", adminMiddleware, getAdminUserStats);
  *     security:
  *       - BearerAuth: []
  */
-analyticsRoutes.get("/admin/history", adminMiddleware, getAdminHistory);
+analyticsRoutes.get("/admin/history", adminMiddleware, asyncHandler(getAdminHistory));
 
 export default analyticsRoutes;
