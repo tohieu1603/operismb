@@ -24,6 +24,9 @@ export class DepositOrderEntity {
   @Column({ type: 'text', nullable: false, unique: true })
   order_code!: string;
 
+  @Column({ type: 'text', nullable: false, default: 'token' })
+  type!: string;
+
   @Column({ type: 'integer', nullable: false })
   token_amount!: number;
 
