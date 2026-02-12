@@ -5,6 +5,19 @@
 
 import type { OperisUser, OperisApiKey, SafeUser, SafeApiKey } from "../core/types/entities.js";
 
+/**
+ * Escape HTML special characters to prevent XSS
+ * Used for user-supplied text fields before storing
+ */
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 export function sanitizeUser(user: OperisUser): SafeUser {
   const { password_hash: _, ...safe } = user;
   return safe;

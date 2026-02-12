@@ -3,96 +3,80 @@
  * CRUD operations for agents table
  */
 
-import { queryOne, queryAll } from "../connection.js";
+import { AppDataSource } from "../data-source.js";
+import { AgentEntity } from "../entities/agent.entity.js";
 import type { Agent, AgentCreate, AgentUpdate } from "./types.js";
+
+function getRepo() {
+  return AppDataSource.getRepository(AgentEntity);
+}
 
 /**
  * Create a new agent
  */
 export async function createAgent(data: AgentCreate): Promise<Agent> {
-  const result = await queryOne<Agent>(
-    `INSERT INTO agents (
-      box_id, customer_id, name, model, system_prompt, status, metadata
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-    RETURNING *`,
-    [
-      data.box_id,
-      data.customer_id,
-      data.name,
-      data.model,
-      data.system_prompt ?? null,
-      data.status ?? "active",
-      JSON.stringify(data.metadata ?? {}),
-    ],
-  );
+  const entity = getRepo().create({
+    box_id: data.box_id,
+    customer_id: data.customer_id,
+    name: data.name,
+    model: data.model,
+    system_prompt: data.system_prompt ?? null,
+    status: data.status ?? "active",
+    metadata: data.metadata ?? {},
+  });
 
-  if (!result) {
-    throw new Error("Failed to create agent");
-  }
-
-  return result;
+  const result = await getRepo().save(entity);
+  return result as unknown as Agent;
 }
 
 /**
  * Get agent by ID
  */
 export async function getAgentById(id: string): Promise<Agent | null> {
-  return queryOne<Agent>("SELECT * FROM agents WHERE id = $1", [id]);
+  const result = await getRepo().findOneBy({ id });
+  return result as unknown as Agent | null;
 }
 
 /**
  * Update agent
  */
 export async function updateAgent(id: string, data: AgentUpdate): Promise<Agent | null> {
-  const fields: string[] = [];
-  const values: unknown[] = [];
-  let paramIndex = 1;
+  const updateData: Record<string, any> = {};
 
   if (data.name !== undefined) {
-    fields.push(`name = $${paramIndex++}`);
-    values.push(data.name);
+    updateData.name = data.name;
   }
   if (data.model !== undefined) {
-    fields.push(`model = $${paramIndex++}`);
-    values.push(data.model);
+    updateData.model = data.model;
   }
   if (data.system_prompt !== undefined) {
-    fields.push(`system_prompt = $${paramIndex++}`);
-    values.push(data.system_prompt);
+    updateData.system_prompt = data.system_prompt;
   }
   if (data.status !== undefined) {
-    fields.push(`status = $${paramIndex++}`);
-    values.push(data.status);
+    updateData.status = data.status;
   }
   if (data.last_active_at !== undefined) {
-    fields.push(`last_active_at = $${paramIndex++}`);
-    values.push(data.last_active_at);
+    updateData.last_active_at = data.last_active_at;
   }
   if (data.metadata !== undefined) {
-    fields.push(`metadata = $${paramIndex++}`);
-    values.push(JSON.stringify(data.metadata));
+    updateData.metadata = data.metadata;
   }
 
-  if (fields.length === 0) {
+  if (Object.keys(updateData).length === 0) {
     return getAgentById(id);
   }
 
-  values.push(id);
-
-  return queryOne<Agent>(
-    `UPDATE agents SET ${fields.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
-    values,
-  );
+  await getRepo().update({ id }, updateData);
+  const result = await getRepo().findOneBy({ id });
+  return result as unknown as Agent | null;
 }
 
 /**
  * Delete agent
  */
 export async function deleteAgent(id: string): Promise<boolean> {
-  const result = await queryOne<{ id: string }>("DELETE FROM agents WHERE id = $1 RETURNING id", [
-    id,
-  ]);
-  return result !== null;
+  const result = await getRepo().delete({ id });
+  return (result.affected ?? 0) > 0;
 }
 
 /**
@@ -108,30 +92,23 @@ export async function listAgentsByBox(
 ): Promise<{ agents: Agent[]; total: number }> {
   const limit = options?.limit ?? 100;
   const offset = options?.offset ?? 0;
-  const params: unknown[] = [boxId];
 
-  let whereClause = "WHERE box_id = $1";
+  const whereConditions: Record<string, any> = { box_id: boxId };
 
   if (options?.status) {
-    whereClause += ` AND status = $${params.length + 1}`;
-    params.push(options.status);
+    whereConditions.status = options.status;
   }
 
-  const countResult = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM agents ${whereClause}`,
-    params,
-  );
-
-  const agents = await queryAll<Agent>(
-    `SELECT * FROM agents ${whereClause}
-     ORDER BY created_at DESC
-     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-    [...params, limit, offset],
-  );
+  const [agents, total] = await getRepo().findAndCount({
+    where: whereConditions,
+    order: { created_at: "DESC" },
+    take: limit,
+    skip: offset,
+  });
 
   return {
-    agents,
-    total: parseInt(countResult?.count ?? "0", 10),
+    agents: agents as unknown as Agent[],
+    total,
   };
 }
 
@@ -149,34 +126,26 @@ export async function listAgentsByCustomer(
 ): Promise<{ agents: Agent[]; total: number }> {
   const limit = options?.limit ?? 100;
   const offset = options?.offset ?? 0;
-  const params: unknown[] = [customerId];
 
-  let whereClause = "WHERE customer_id = $1";
+  const whereConditions: Record<string, any> = { customer_id: customerId };
 
   if (options?.boxId) {
-    whereClause += ` AND box_id = $${params.length + 1}`;
-    params.push(options.boxId);
+    whereConditions.box_id = options.boxId;
   }
   if (options?.status) {
-    whereClause += ` AND status = $${params.length + 1}`;
-    params.push(options.status);
+    whereConditions.status = options.status;
   }
 
-  const countResult = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM agents ${whereClause}`,
-    params,
-  );
-
-  const agents = await queryAll<Agent>(
-    `SELECT * FROM agents ${whereClause}
-     ORDER BY created_at DESC
-     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-    [...params, limit, offset],
-  );
+  const [agents, total] = await getRepo().findAndCount({
+    where: whereConditions,
+    order: { created_at: "DESC" },
+    take: limit,
+    skip: offset,
+  });
 
   return {
-    agents,
-    total: parseInt(countResult?.count ?? "0", 10),
+    agents: agents as unknown as Agent[],
+    total,
   };
 }
 
@@ -185,40 +154,46 @@ export async function listAgentsByCustomer(
  * (Used for limit checking)
  */
 export async function countActiveAgentsForBox(boxId: string): Promise<number> {
-  const result = await queryOne<{ count: string }>(
-    "SELECT COUNT(*) as count FROM agents WHERE box_id = $1 AND status = 'active'",
-    [boxId],
-  );
-  return parseInt(result?.count ?? "0", 10);
+  return await getRepo().count({
+    where: { box_id: boxId, status: "active" },
+  });
 }
 
 /**
  * Update agent's last active timestamp
  */
 export async function touchAgent(id: string): Promise<void> {
-  await queryOne("UPDATE agents SET last_active_at = NOW() WHERE id = $1", [id]);
+  await getRepo().update({ id }, { last_active_at: new Date() });
 }
 
 /**
  * Pause all agents for a box
  */
 export async function pauseAllAgentsForBox(boxId: string): Promise<number> {
-  const result = await queryAll<{ id: string }>(
-    "UPDATE agents SET status = 'paused' WHERE box_id = $1 AND status = 'active' RETURNING id",
-    [boxId],
-  );
-  return result.length;
+  const result = await getRepo()
+    .createQueryBuilder()
+    .update()
+    .set({ status: "paused" })
+    .where("box_id = :boxId AND status = 'active'", { boxId })
+    .returning("id")
+    .execute();
+
+  return result.affected ?? 0;
 }
 
 /**
  * Resume all agents for a box
  */
 export async function resumeAllAgentsForBox(boxId: string): Promise<number> {
-  const result = await queryAll<{ id: string }>(
-    "UPDATE agents SET status = 'active' WHERE box_id = $1 AND status = 'paused' RETURNING id",
-    [boxId],
-  );
-  return result.length;
+  const result = await getRepo()
+    .createQueryBuilder()
+    .update()
+    .set({ status: "active" })
+    .where("box_id = :boxId AND status = 'paused'", { boxId })
+    .returning("id")
+    .execute();
+
+  return result.affected ?? 0;
 }
 
 export default {

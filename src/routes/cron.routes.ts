@@ -23,6 +23,8 @@
 import { Router } from "express";
 import { cronController } from "../controllers/cron.controller.js";
 import { authMiddleware, adminMiddleware, asyncHandler } from "../middleware/index.js";
+import { validateBody } from "../middleware/validate.middleware.js";
+import { validateCreateCronjob, validateUpdateCronjob, validateToggleCronjob } from "../validators/cron.validator.js";
 
 const router = Router();
 
@@ -327,6 +329,7 @@ router.get(
  */
 router.post(
   "/",
+  validateBody(validateCreateCronjob),
   asyncHandler((req, res) => cronController.create(req, res)),
 );
 
@@ -521,6 +524,7 @@ router.get(
  */
 router.patch(
   "/:id",
+  validateBody(validateUpdateCronjob),
   asyncHandler((req, res) => cronController.update(req, res)),
 );
 
@@ -663,6 +667,7 @@ router.delete(
  */
 router.post(
   "/:id/toggle",
+  validateBody(validateToggleCronjob),
   asyncHandler((req, res) => cronController.toggle(req, res)),
 );
 

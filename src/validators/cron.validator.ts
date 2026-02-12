@@ -3,6 +3,7 @@
  */
 
 import type { ValidationResult } from "./common.validator.js";
+import { escapeHtml } from "../utils/sanitize.util.js";
 
 // Cron schedule regex (basic validation - 5 or 6 fields)
 const CRON_REGEX = /^(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)(\s+(\*|[0-9,\-\/]+))?$/;
@@ -317,8 +318,8 @@ export function validateCreateCronjob(body: unknown): ValidationResult<CreateCro
     data: {
       box_id: box_id ? (box_id as string).trim() : undefined,
       agent_id: agent_id ? (agent_id as string).trim() : undefined,
-      name: (name as string).trim(),
-      description: description ? (description as string).trim() : undefined,
+      name: escapeHtml((name as string).trim()),
+      description: description ? escapeHtml((description as string).trim()) : undefined,
       schedule_type: scheduleTypeValue as "cron" | "every" | "at",
       schedule_expr: (schedule_expr as string).trim(),
       schedule_tz: schedule_tz ? (schedule_tz as string).trim() : undefined,
@@ -328,7 +329,7 @@ export function validateCreateCronjob(body: unknown): ValidationResult<CreateCro
       session_target: (session_target as "main" | "isolated") ?? "main",
       wake_mode: (wake_mode as "next-heartbeat" | "now") ?? "next-heartbeat",
       payload_kind: (payload_kind as "systemEvent" | "agentTurn") ?? "agentTurn",
-      message: (message as string).trim(),
+      message: escapeHtml((message as string).trim()),
       model: model ? (model as string).trim() : undefined,
       thinking: thinking ? (thinking as string).trim() : undefined,
       timeout_seconds: timeout_seconds as number | undefined,
@@ -557,8 +558,8 @@ export function validateUpdateCronjob(body: unknown): ValidationResult<UpdateCro
     errors: [],
     data: {
       agent_id: agent_id ? (agent_id as string).trim() : undefined,
-      name: name ? (name as string).trim() : undefined,
-      description: description ? (description as string).trim() : undefined,
+      name: name ? escapeHtml((name as string).trim()) : undefined,
+      description: description ? escapeHtml((description as string).trim()) : undefined,
       schedule_type: schedule_type as "cron" | "every" | "at" | undefined,
       schedule_expr: schedule_expr ? (schedule_expr as string).trim() : undefined,
       schedule_tz: schedule_tz ? (schedule_tz as string).trim() : undefined,
@@ -568,7 +569,7 @@ export function validateUpdateCronjob(body: unknown): ValidationResult<UpdateCro
       session_target: session_target as "main" | "isolated" | undefined,
       wake_mode: wake_mode as "next-heartbeat" | "now" | undefined,
       payload_kind: payload_kind as "systemEvent" | "agentTurn" | undefined,
-      message: message ? (message as string).trim() : undefined,
+      message: message ? escapeHtml((message as string).trim()) : undefined,
       model: model ? (model as string).trim() : undefined,
       thinking: thinking ? (thinking as string).trim() : undefined,
       timeout_seconds: timeout_seconds as number | undefined,

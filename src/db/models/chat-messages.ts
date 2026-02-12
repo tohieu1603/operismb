@@ -1,9 +1,10 @@
 /**
  * Chat Messages Repository
- * CRUD operations for chat history in PostgreSQL
+ * CRUD operations for chat history using TypeORM
  */
 
-import { query, queryOne, queryAll } from "../connection.js";
+import { AppDataSource } from "../data-source.js";
+import { ChatMessageEntity } from "../entities/chat-message.entity.js";
 
 export interface ChatMessage {
   id: string;
@@ -33,30 +34,29 @@ export interface CreateMessageInput {
   cost?: number;
 }
 
+function getRepo() {
+  return AppDataSource.getRepository(ChatMessageEntity);
+}
+
 class ChatMessagesRepo {
   /**
    * Save a message to the database
    */
   async createMessage(input: CreateMessageInput): Promise<ChatMessage> {
-    const result = await queryOne<ChatMessage>(
-      `INSERT INTO chat_messages
-        (user_id, conversation_id, role, content, model, provider, tokens_used, input_tokens, output_tokens, cost)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING *`,
-      [
-        input.user_id,
-        input.conversation_id,
-        input.role,
-        input.content,
-        input.model || null,
-        input.provider || null,
-        input.tokens_used || 0,
-        input.input_tokens || 0,
-        input.output_tokens || 0,
-        input.cost || 0,
-      ],
-    );
-    return result!;
+    const message = getRepo().create({
+      user_id: input.user_id,
+      conversation_id: input.conversation_id,
+      role: input.role,
+      content: input.content,
+      model: input.model || null,
+      provider: input.provider || null,
+      tokens_used: input.tokens_used || 0,
+      input_tokens: input.input_tokens || 0,
+      output_tokens: input.output_tokens || 0,
+      cost: input.cost !== undefined ? String(input.cost) : null,
+    });
+    const saved = await getRepo().save(message);
+    return saved as unknown as ChatMessage;
   }
 
   /**
@@ -69,8 +69,8 @@ class ChatMessagesRepo {
     conversationId: string,
     limit: number = 50,
   ): Promise<ChatMessage[]> {
-    // Subquery: get N newest messages, then order by ASC for correct timeline
-    return queryAll<ChatMessage>(
+    // Use raw query to handle subquery with ORDER DESC then ASC
+    const messages = await AppDataSource.query(
       `SELECT * FROM (
          SELECT * FROM chat_messages
          WHERE user_id = $1::uuid AND conversation_id = $2
@@ -80,6 +80,7 @@ class ChatMessagesRepo {
        ORDER BY created_at ASC`,
       [userId, conversationId, limit],
     );
+    return messages as ChatMessage[];
   }
 
   /**
@@ -87,14 +88,15 @@ class ChatMessagesRepo {
    * (to continue where they left off)
    */
   async getLatestConversationId(userId: string): Promise<string | null> {
-    const result = await queryOne<{ conversation_id: string }>(
-      `SELECT conversation_id FROM chat_messages
-       WHERE user_id = $1::uuid
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [userId],
-    );
-    return result?.conversation_id || null;
+    const result = await getRepo()
+      .createQueryBuilder("msg")
+      .select("msg.conversation_id")
+      .where("msg.user_id = :userId", { userId })
+      .orderBy("msg.created_at", "DESC")
+      .limit(1)
+      .getRawOne<{ msg_conversation_id: string }>();
+
+    return result?.msg_conversation_id || null;
   }
 
   /**
@@ -104,7 +106,8 @@ class ChatMessagesRepo {
     userId: string,
     limit: number = 20,
   ): Promise<{ conversation_id: string; last_message: string; created_at: Date }[]> {
-    return queryAll(
+    // Use raw query for DISTINCT ON (PostgreSQL-specific)
+    const results = await AppDataSource.query(
       `SELECT DISTINCT ON (conversation_id)
         conversation_id,
         content as last_message,
@@ -115,17 +118,20 @@ class ChatMessagesRepo {
        LIMIT $2`,
       [userId, limit],
     );
+    return results;
   }
 
   /**
    * Delete a conversation
    */
   async deleteConversation(userId: string, conversationId: string): Promise<void> {
-    await query(
-      `DELETE FROM chat_messages
-       WHERE user_id = $1::uuid AND conversation_id = $2`,
-      [userId, conversationId],
-    );
+    await getRepo()
+      .createQueryBuilder()
+      .delete()
+      .from(ChatMessageEntity)
+      .where("user_id = :userId", { userId })
+      .andWhere("conversation_id = :conversationId", { conversationId })
+      .execute();
   }
 
   /**
@@ -135,15 +141,15 @@ class ChatMessagesRepo {
     userId: string,
     conversationId: string,
   ): Promise<{ total_tokens: number; total_cost: number; message_count: number }> {
-    const result = await queryOne<{ total_tokens: string; total_cost: string; message_count: string }>(
-      `SELECT
-        COALESCE(SUM(tokens_used), 0) as total_tokens,
-        COALESCE(SUM(cost::numeric), 0) as total_cost,
-        COUNT(*) as message_count
-       FROM chat_messages
-       WHERE user_id = $1::uuid AND conversation_id = $2`,
-      [userId, conversationId],
-    );
+    const result = await getRepo()
+      .createQueryBuilder("msg")
+      .select("COALESCE(SUM(msg.tokens_used), 0)", "total_tokens")
+      .addSelect("COALESCE(SUM(msg.cost::numeric), 0)", "total_cost")
+      .addSelect("COUNT(*)", "message_count")
+      .where("msg.user_id = :userId", { userId })
+      .andWhere("msg.conversation_id = :conversationId", { conversationId })
+      .getRawOne<{ total_tokens: string; total_cost: string; message_count: string }>();
+
     return {
       total_tokens: parseInt(result?.total_tokens || "0", 10),
       total_cost: parseFloat(result?.total_cost || "0"),
@@ -155,12 +161,13 @@ class ChatMessagesRepo {
    * Count messages in a conversation
    */
   async countMessages(userId: string, conversationId: string): Promise<number> {
-    const result = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM chat_messages
-       WHERE user_id = $1::uuid AND conversation_id = $2`,
-      [userId, conversationId],
-    );
-    return parseInt(result?.count || "0", 10);
+    const count = await getRepo()
+      .createQueryBuilder("msg")
+      .where("msg.user_id = :userId", { userId })
+      .andWhere("msg.conversation_id = :conversationId", { conversationId })
+      .getCount();
+
+    return count;
   }
 }
 

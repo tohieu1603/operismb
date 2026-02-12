@@ -47,17 +47,36 @@ class UserService {
     return sanitizeUser(user);
   }
 
+  /** Allowed fields for admin user update (whitelist to prevent mass assignment) */
+  private static ALLOWED_UPDATE_FIELDS = new Set([
+    "name", "email", "role", "is_active", "token_balance",
+    "gateway_url", "gateway_token", "gateway_hooks_token",
+    "unique_machine", "auth_profiles_path", "password",
+  ]);
+
   async update(id: string, data: Record<string, unknown>): Promise<SafeUser> {
     const existing = await usersRepo.getUserById(id);
     if (!existing) throw Errors.notFound("User");
 
-    // Hash password if provided
-    if (data.password) {
-      data.password_hash = await hashPassword(data.password as string);
-      delete data.password;
+    // Whitelist: only allow known safe fields (prevent mass assignment)
+    const safeData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (UserService.ALLOWED_UPDATE_FIELDS.has(key)) {
+        safeData[key] = value;
+      }
     }
 
-    const user = await usersRepo.updateUser(id, data);
+    // Hash password if provided
+    if (safeData.password) {
+      safeData.password_hash = await hashPassword(safeData.password as string);
+      delete safeData.password;
+    }
+
+    if (Object.keys(safeData).length === 0) {
+      return sanitizeUser(existing);
+    }
+
+    const user = await usersRepo.updateUser(id, safeData);
     if (!user) throw Errors.notFound("User");
     return sanitizeUser(user);
   }

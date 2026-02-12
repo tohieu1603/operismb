@@ -4,7 +4,8 @@
  */
 
 import { Errors } from "../core/errors/api-error.js";
-import { depositsRepo, usersRepo, transaction } from "../db/index.js";
+import { depositsRepo, usersRepo } from "../db/index.js";
+import { AppDataSource } from "../db/data-source.js";
 import { creditTokensWithClient } from "../db/models/token-transactions.js";
 import { tokenService } from "./token.service.js";
 import type { DepositOrder } from "../db/models/deposits.js";
@@ -113,9 +114,9 @@ class DepositService {
    * Cancel pending order (allows creating new one)
    */
   async cancelPendingOrder(userId: string, orderId: string): Promise<{ success: boolean }> {
-    const order = await depositsRepo.getDepositOrderById(orderId);
+    // Anti-IDOR: query scoped to userId
+    const order = await depositsRepo.getDepositOrderByIdAndUser(orderId, userId);
     if (!order) throw Errors.notFound("Deposit order");
-    if (order.user_id !== userId) throw Errors.forbidden("Not your deposit order");
     if (order.status !== "pending") {
       throw Errors.badRequest("Only pending orders can be cancelled");
     }
@@ -125,12 +126,12 @@ class DepositService {
   }
 
   /**
-   * Get deposit order by ID
+   * Get deposit order by ID (scoped to user)
    */
   async getDeposit(userId: string, depositId: string): Promise<DepositOrderResponse> {
-    const order = await depositsRepo.getDepositOrderById(depositId);
+    // Anti-IDOR: query scoped to userId
+    const order = await depositsRepo.getDepositOrderByIdAndUser(depositId, userId);
     if (!order) throw Errors.notFound("Deposit order");
-    if (order.user_id !== userId) throw Errors.forbidden("Not your deposit order");
 
     return this.formatDepositResponse(order);
   }
@@ -230,9 +231,9 @@ class DepositService {
     }
 
     // Atomic: update order + credit tokens in single transaction
-    await transaction(async (client) => {
+    await AppDataSource.transaction(async (manager) => {
       // Update order status to completed
-      await client.query(
+      await manager.query(
         `UPDATE deposit_orders
          SET status = 'completed',
              payment_method = $2,
@@ -244,7 +245,7 @@ class DepositService {
 
       // Credit tokens to user
       await creditTokensWithClient(
-        client,
+        manager,
         order.user_id,
         order.token_amount,
         `Deposit: ${orderCode}`,

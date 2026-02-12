@@ -3,148 +3,94 @@
  * CRUD operations for users table (Operis admin users)
  */
 
-import { query, queryOne, queryAll } from "../connection.js";
+import { AppDataSource } from "../data-source.js";
+import { UserEntity } from "../entities/user.entity.js";
 import type { User, UserCreate, UserUpdate } from "./types.js";
+
+function getRepo() {
+  return AppDataSource.getRepository(UserEntity);
+}
 
 /**
  * Create a new user
  */
 export async function createUser(data: UserCreate): Promise<User> {
-  // Build columns dynamically: required + optional fields
-  const columns: string[] = ["email", "password_hash", "name", "role", "token_balance"];
-  const values: unknown[] = [
-    data.email.toLowerCase(),
-    data.password_hash,
-    data.name,
-    data.role ?? "user",
-    data.token_balance ?? 1000000,
-  ];
+  const user = getRepo().create({
+    email: data.email.toLowerCase(),
+    password_hash: data.password_hash,
+    name: data.name,
+    role: data.role ?? "user",
+    token_balance: data.token_balance ?? 1000000,
+    is_active: data.is_active,
+    unique_machine: data.unique_machine,
+    gateway_url: data.gateway_url,
+    gateway_token: data.gateway_token,
+    gateway_hooks_token: data.gateway_hooks_token,
+    auth_profiles_path: data.auth_profiles_path,
+  });
 
-  const optionalFields: Array<[string, unknown]> = [
-    ["is_active", data.is_active],
-    ["unique_machine", data.unique_machine],
-    ["gateway_url", data.gateway_url],
-    ["gateway_token", data.gateway_token],
-    ["gateway_hooks_token", data.gateway_hooks_token],
-    ["auth_profiles_path", data.auth_profiles_path],
-  ];
-
-  for (const [col, val] of optionalFields) {
-    if (val !== undefined) {
-      columns.push(col);
-      values.push(val);
-    }
-  }
-
-  const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await queryOne<User>(
-    `INSERT INTO users (${columns.join(", ")}) VALUES (${placeholders}) RETURNING *`,
-    values,
-  );
-
-  if (!result) {
-    throw new Error("Failed to create user");
-  }
-
-  return result;
+  const result = await getRepo().save(user);
+  return result as unknown as User;
 }
 
 /**
  * Get user by unique_machine
  */
 export async function getUserByMachine(machine: string): Promise<User | null> {
-  return queryOne<User>("SELECT * FROM users WHERE unique_machine = $1", [machine]);
+  const result = await getRepo().findOneBy({ unique_machine: machine });
+  return result as unknown as User | null;
 }
 
 /**
  * Get user by ID
  */
 export async function getUserById(id: string): Promise<User | null> {
-  return queryOne<User>("SELECT * FROM users WHERE id = $1", [id]);
+  const result = await getRepo().findOneBy({ id });
+  return result as unknown as User | null;
 }
 
 /**
  * Get user by email
  */
 export async function getUserByEmail(email: string): Promise<User | null> {
-  return queryOne<User>("SELECT * FROM users WHERE email = $1", [email.toLowerCase()]);
+  const result = await getRepo().findOneBy({ email: email.toLowerCase() });
+  return result as unknown as User | null;
 }
 
 /**
  * Update user
  */
 export async function updateUser(id: string, data: UserUpdate): Promise<User | null> {
-  const fields: string[] = [];
-  const values: unknown[] = [];
-  let paramIndex = 1;
+  const updateData: Partial<UserEntity> = {};
 
-  if (data.name !== undefined) {
-    fields.push(`name = $${paramIndex++}`);
-    values.push(data.name);
-  }
-  if (data.email !== undefined) {
-    fields.push(`email = $${paramIndex++}`);
-    values.push(data.email.toLowerCase());
-  }
-  if (data.password_hash !== undefined) {
-    fields.push(`password_hash = $${paramIndex++}`);
-    values.push(data.password_hash);
-  }
-  if (data.role !== undefined) {
-    fields.push(`role = $${paramIndex++}`);
-    values.push(data.role);
-  }
-  if (data.is_active !== undefined) {
-    fields.push(`is_active = $${paramIndex++}`);
-    values.push(data.is_active);
-  }
-  if (data.last_active_at !== undefined) {
-    fields.push(`last_active_at = $${paramIndex++}`);
-    values.push(data.last_active_at);
-  }
-  if (data.token_balance !== undefined) {
-    fields.push(`token_balance = $${paramIndex++}`);
-    values.push(data.token_balance);
-  }
-  if (data.gateway_url !== undefined) {
-    fields.push(`gateway_url = $${paramIndex++}`);
-    values.push(data.gateway_url);
-  }
-  if (data.gateway_token !== undefined) {
-    fields.push(`gateway_token = $${paramIndex++}`);
-    values.push(data.gateway_token);
-  }
-  if (data.gateway_hooks_token !== undefined) {
-    fields.push(`gateway_hooks_token = $${paramIndex++}`);
-    values.push(data.gateway_hooks_token);
-  }
-  if (data.unique_machine !== undefined) {
-    fields.push(`unique_machine = $${paramIndex++}`);
-    values.push(data.unique_machine);
-  }
-  if (data.auth_profiles_path !== undefined) {
-    fields.push(`auth_profiles_path = $${paramIndex++}`);
-    values.push(data.auth_profiles_path);
-  }
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.email !== undefined) updateData.email = data.email.toLowerCase();
+  if (data.password_hash !== undefined) updateData.password_hash = data.password_hash;
+  if (data.role !== undefined) updateData.role = data.role;
+  if (data.is_active !== undefined) updateData.is_active = data.is_active;
+  if (data.last_active_at !== undefined) updateData.last_active_at = data.last_active_at;
+  if (data.token_balance !== undefined) updateData.token_balance = data.token_balance;
+  if (data.gateway_url !== undefined) updateData.gateway_url = data.gateway_url;
+  if (data.gateway_token !== undefined) updateData.gateway_token = data.gateway_token;
+  if (data.gateway_hooks_token !== undefined) updateData.gateway_hooks_token = data.gateway_hooks_token;
+  if (data.unique_machine !== undefined) updateData.unique_machine = data.unique_machine;
+  if (data.auth_profiles_path !== undefined) updateData.auth_profiles_path = data.auth_profiles_path;
 
-  if (fields.length === 0) {
+  if (Object.keys(updateData).length === 0) {
     return getUserById(id);
   }
 
-  values.push(id);
-
-  return queryOne<User>(
-    `UPDATE users SET ${fields.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
-    values,
-  );
+  await getRepo().update({ id }, updateData);
+  const result = await getRepo().findOneBy({ id });
+  return result as unknown as User | null;
 }
 
 /**
  * Delete user
  */
 export async function deleteUser(id: string): Promise<boolean> {
-  const result = await query("DELETE FROM users WHERE id = $1", [id]);
-  return (result.rowCount ?? 0) > 0;
+  const result = await getRepo().delete({ id });
+  return (result.affected ?? 0) > 0;
 }
 
 /**
@@ -160,45 +106,29 @@ export async function listUsers(options: {
   const limit = options.limit ?? 50;
   const offset = options.offset ?? 0;
 
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-  let paramIndex = 1;
+  const qb = getRepo().createQueryBuilder("u");
 
   if (options.search) {
-    conditions.push(`(email ILIKE $${paramIndex} OR name ILIKE $${paramIndex})`);
-    params.push(`%${options.search}%`);
-    paramIndex++;
+    qb.andWhere("(u.email ILIKE :search OR u.name ILIKE :search)", {
+      search: `%${options.search}%`,
+    });
   }
 
   if (options.role) {
-    conditions.push(`role = $${paramIndex}`);
-    params.push(options.role);
-    paramIndex++;
+    qb.andWhere("u.role = :role", { role: options.role });
   }
 
   if (options.status) {
-    conditions.push(`is_active = $${paramIndex}`);
-    params.push(options.status === "active");
-    paramIndex++;
+    qb.andWhere("u.is_active = :is_active", { is_active: options.status === "active" });
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  qb.orderBy("u.created_at", "DESC").take(limit).skip(offset);
 
-  const countResult = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM users ${whereClause}`,
-    params,
-  );
-
-  const users = await queryAll<User>(
-    `SELECT * FROM users ${whereClause}
-     ORDER BY created_at DESC
-     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-    [...params, limit, offset],
-  );
+  const [users, total] = await qb.getManyAndCount();
 
   return {
-    users,
-    total: parseInt(countResult?.count ?? "0", 10),
+    users: users as unknown as User[],
+    total,
   };
 }
 
@@ -206,24 +136,24 @@ export async function listUsers(options: {
  * Update user token balance
  */
 export async function updateTokenBalance(id: string, amount: number): Promise<User | null> {
-  return queryOne<User>(
-    `UPDATE users
-     SET token_balance = token_balance + $1
-     WHERE id = $2
-     RETURNING *`,
-    [amount, id],
-  );
+  const result = await getRepo()
+    .createQueryBuilder()
+    .update()
+    .set({ token_balance: () => "token_balance + :amount" })
+    .setParameter("amount", amount)
+    .where("id = :id", { id })
+    .returning("*")
+    .execute();
+
+  return result.raw[0] as unknown as User | null;
 }
 
 /**
  * Check if user has enough tokens
  */
 export async function hasEnoughTokens(id: string, amount: number): Promise<boolean> {
-  const result = await queryOne<{ has_enough: boolean }>(
-    `SELECT token_balance >= $1 as has_enough FROM users WHERE id = $2`,
-    [amount, id],
-  );
-  return result?.has_enough ?? false;
+  const user = await getRepo().findOneBy({ id });
+  return user ? user.token_balance >= amount : false;
 }
 
 export default {

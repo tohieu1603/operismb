@@ -3,7 +3,8 @@
  * CRUD operations for deposit_orders table
  */
 
-import { query, queryOne, queryAll } from "../connection.js";
+import { AppDataSource } from "../data-source.js";
+import { DepositOrderEntity } from "../entities/deposit-order.entity.js";
 
 export interface DepositOrder {
   id: string;
@@ -32,6 +33,10 @@ export interface DepositOrderCreate {
 export const TOKEN_PRICE_VND = 500000; // VND per 1M tokens
 export const TOKENS_PER_UNIT = 1000000; // 1M tokens
 
+function getRepo() {
+  return AppDataSource.getRepository(DepositOrderEntity);
+}
+
 /**
  * Calculate VND amount from token amount
  */
@@ -59,33 +64,40 @@ export function generateOrderCode(): string {
  * Create a new deposit order
  */
 export async function createDepositOrder(data: DepositOrderCreate): Promise<DepositOrder> {
-  const result = await queryOne<DepositOrder>(
-    `INSERT INTO deposit_orders (
-      user_id, order_code, token_amount, amount_vnd, expires_at
-    ) VALUES ($1, $2, $3, $4, $5)
-    RETURNING *`,
-    [data.user_id, data.order_code, data.token_amount, data.amount_vnd, data.expires_at],
-  );
+  const entity = getRepo().create({
+    user_id: data.user_id,
+    order_code: data.order_code,
+    token_amount: data.token_amount,
+    amount_vnd: data.amount_vnd,
+    expires_at: data.expires_at,
+  });
 
-  if (!result) {
-    throw new Error("Failed to create deposit order");
-  }
-
-  return result;
+  const result = await getRepo().save(entity);
+  return result as unknown as DepositOrder;
 }
 
 /**
  * Get deposit order by ID
  */
 export async function getDepositOrderById(id: string): Promise<DepositOrder | null> {
-  return queryOne<DepositOrder>("SELECT * FROM deposit_orders WHERE id = $1", [id]);
+  const result = await getRepo().findOneBy({ id });
+  return result as unknown as DepositOrder | null;
+}
+
+/**
+ * Get deposit order scoped to user (anti-IDOR: query with both id + user_id)
+ */
+export async function getDepositOrderByIdAndUser(id: string, userId: string): Promise<DepositOrder | null> {
+  const result = await getRepo().findOneBy({ id, user_id: userId });
+  return result as unknown as DepositOrder | null;
 }
 
 /**
  * Get deposit order by order code
  */
 export async function getDepositOrderByCode(orderCode: string): Promise<DepositOrder | null> {
-  return queryOne<DepositOrder>("SELECT * FROM deposit_orders WHERE order_code = $1", [orderCode]);
+  const result = await getRepo().findOneBy({ order_code: orderCode });
+  return result as unknown as DepositOrder | null;
 }
 
 /**
@@ -96,13 +108,14 @@ export async function getUserDepositOrders(
   limit = 20,
   offset = 0,
 ): Promise<DepositOrder[]> {
-  return queryAll<DepositOrder>(
-    `SELECT * FROM deposit_orders
-     WHERE user_id = $1
-     ORDER BY created_at DESC
-     LIMIT $2 OFFSET $3`,
-    [userId, limit, offset],
-  );
+  const results = await getRepo().find({
+    where: { user_id: userId },
+    order: { created_at: "DESC" },
+    take: limit,
+    skip: offset,
+  });
+
+  return results as unknown as DepositOrder[];
 }
 
 /**
@@ -117,27 +130,21 @@ export async function updateDepositOrderStatus(
     paid_at?: Date;
   },
 ): Promise<DepositOrder | null> {
-  const updates: string[] = ["status = $2"];
-  const values: unknown[] = [id, status];
-  let paramIndex = 3;
+  const updateData: Partial<DepositOrderEntity> = { status };
 
   if (paymentData?.payment_method) {
-    updates.push(`payment_method = $${paramIndex++}`);
-    values.push(paymentData.payment_method);
+    updateData.payment_method = paymentData.payment_method;
   }
   if (paymentData?.payment_reference) {
-    updates.push(`payment_reference = $${paramIndex++}`);
-    values.push(paymentData.payment_reference);
+    updateData.payment_reference = paymentData.payment_reference;
   }
   if (paymentData?.paid_at) {
-    updates.push(`paid_at = $${paramIndex++}`);
-    values.push(paymentData.paid_at);
+    updateData.paid_at = paymentData.paid_at;
   }
 
-  return queryOne<DepositOrder>(
-    `UPDATE deposit_orders SET ${updates.join(", ")} WHERE id = $1 RETURNING *`,
-    values,
-  );
+  await getRepo().update({ id }, updateData);
+  const result = await getRepo().findOneBy({ id });
+  return result as unknown as DepositOrder | null;
 }
 
 /**
@@ -146,34 +153,35 @@ export async function updateDepositOrderStatus(
 export async function findByPaymentReference(
   paymentReference: string,
 ): Promise<DepositOrder | null> {
-  return queryOne<DepositOrder>(
-    "SELECT * FROM deposit_orders WHERE payment_reference = $1",
-    [paymentReference],
-  );
+  const result = await getRepo().findOneBy({ payment_reference: paymentReference });
+  return result as unknown as DepositOrder | null;
 }
 
 /**
  * Get pending orders that have expired
  */
 export async function getExpiredPendingOrders(): Promise<DepositOrder[]> {
-  return queryAll<DepositOrder>(
-    `SELECT * FROM deposit_orders
-     WHERE status = 'pending' AND expires_at < NOW()`,
-    [],
-  );
+  const results = await getRepo()
+    .createQueryBuilder("d")
+    .where("d.status = 'pending'")
+    .andWhere("d.expires_at < NOW()")
+    .getMany();
+
+  return results as unknown as DepositOrder[];
 }
 
 /**
  * Mark expired orders as expired
  */
 export async function markExpiredOrders(): Promise<number> {
-  const result = await query(
-    `UPDATE deposit_orders
-     SET status = 'expired'
-     WHERE status = 'pending' AND expires_at < NOW()`,
-    [],
-  );
-  return result.rowCount ?? 0;
+  const result = await getRepo()
+    .createQueryBuilder()
+    .update()
+    .set({ status: "expired" })
+    .where("status = 'pending' AND expires_at < NOW()")
+    .execute();
+
+  return result.affected ?? 0;
 }
 
 /**
@@ -188,48 +196,63 @@ export async function listAllDeposits(
   const limit = options.limit ?? 10;
   const offset = options.offset ?? 0;
 
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-  let paramIndex = 1;
+  const qb = getRepo()
+    .createQueryBuilder("d")
+    .leftJoin("users", "u", "d.user_id = u.id")
+    .addSelect("u.email", "user_email")
+    .addSelect("u.name", "user_name");
 
   if (options.status) {
-    conditions.push(`d.status = $${paramIndex}`);
-    params.push(options.status);
-    paramIndex++;
+    qb.andWhere("d.status = :status", { status: options.status });
   }
 
   if (options.userId) {
-    conditions.push(`d.user_id = $${paramIndex}`);
-    params.push(options.userId);
-    paramIndex++;
+    qb.andWhere("d.user_id = :userId", { userId: options.userId });
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const countQb = getRepo().createQueryBuilder("d");
+  if (options.status) {
+    countQb.andWhere("d.status = :status", { status: options.status });
+  }
+  if (options.userId) {
+    countQb.andWhere("d.user_id = :userId", { userId: options.userId });
+  }
 
-  const countResult = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM deposit_orders d ${whereClause}`,
-    params,
-  );
+  const total = await countQb.getCount();
 
-  const deposits = await queryAll<DepositOrder & { user_email: string; user_name: string }>(
-    `SELECT d.*, u.email as user_email, u.name as user_name
-     FROM deposit_orders d
-     JOIN users u ON d.user_id = u.id
-     ${whereClause}
-     ORDER BY d.created_at DESC
-     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-    [...params, limit, offset],
-  );
+  const rawResults = await qb
+    .orderBy("d.created_at", "DESC")
+    .limit(limit)
+    .offset(offset)
+    .getRawMany();
+
+  const deposits = rawResults.map((row) => ({
+    id: row.d_id,
+    user_id: row.d_user_id,
+    order_code: row.d_order_code,
+    token_amount: row.d_token_amount,
+    amount_vnd: row.d_amount_vnd,
+    status: row.d_status,
+    payment_method: row.d_payment_method,
+    payment_reference: row.d_payment_reference,
+    paid_at: row.d_paid_at,
+    expires_at: row.d_expires_at,
+    created_at: row.d_created_at,
+    updated_at: row.d_updated_at,
+    user_email: row.user_email,
+    user_name: row.user_name,
+  }));
 
   return {
     deposits,
-    total: parseInt(countResult?.count ?? "0", 10),
+    total,
   };
 }
 
 export const depositsRepo = {
   createDepositOrder,
   getDepositOrderById,
+  getDepositOrderByIdAndUser,
   getDepositOrderByCode,
   getUserDepositOrders,
   updateDepositOrderStatus,

@@ -1,43 +1,43 @@
 /**
  * Token Transaction Repository
  * CRUD operations for token_transactions table
+ * Migrated to TypeORM from raw SQL
  */
 
-import pg from "pg";
-import { query, queryOne, queryAll, transaction } from "../connection.js";
+import { EntityManager } from "typeorm";
+import { AppDataSource } from "../data-source.js";
+import { TokenTransactionEntity } from "../entities/token-transaction.entity.js";
+import { UserEntity } from "../entities/user.entity.js";
 import type { TokenTransaction, TokenTransactionCreate, User } from "./types.js";
 
 /**
  * Create a new transaction
  */
 export async function createTransaction(data: TokenTransactionCreate): Promise<TokenTransaction> {
-  const result = await queryOne<TokenTransaction>(
-    `INSERT INTO token_transactions (
-      user_id, type, amount, balance_after, description, reference_id
-    ) VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *`,
-    [
-      data.user_id,
-      data.type,
-      data.amount,
-      data.balance_after,
-      data.description ?? null,
-      data.reference_id ?? null,
-    ],
-  );
+  const repo = AppDataSource.getRepository(TokenTransactionEntity);
 
-  if (!result) {
-    throw new Error("Failed to create transaction");
-  }
+  const transaction = repo.create({
+    user_id: data.user_id,
+    type: data.type,
+    amount: data.amount,
+    balance_after: data.balance_after,
+    description: data.description ?? null,
+    reference_id: data.reference_id ?? null,
+  });
 
-  return result;
+  const saved = await repo.save(transaction);
+
+  return saved as unknown as TokenTransaction;
 }
 
 /**
  * Get transaction by ID
  */
 export async function getTransactionById(id: string): Promise<TokenTransaction | null> {
-  return queryOne<TokenTransaction>("SELECT * FROM token_transactions WHERE id = $1", [id]);
+  const repo = AppDataSource.getRepository(TokenTransactionEntity);
+  const transaction = await repo.findOneBy({ id });
+
+  return transaction ? (transaction as unknown as TokenTransaction) : null;
 }
 
 /**
@@ -54,33 +54,24 @@ export async function listTransactionsByUserId(
   const limit = options.limit ?? 50;
   const offset = options.offset ?? 0;
 
-  const conditions: string[] = ["user_id = $1"];
-  const params: unknown[] = [userId];
-  let paramIndex = 2;
+  const repo = AppDataSource.getRepository(TokenTransactionEntity);
+  const qb = repo.createQueryBuilder("t").where("t.user_id = :userId", { userId });
 
   if (options.type) {
-    conditions.push(`type = $${paramIndex}`);
-    params.push(options.type);
-    paramIndex++;
+    qb.andWhere("t.type = :type", { type: options.type });
   }
 
-  const whereClause = `WHERE ${conditions.join(" AND ")}`;
+  const total = await qb.getCount();
 
-  const countResult = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM token_transactions ${whereClause}`,
-    params,
-  );
-
-  const transactions = await queryAll<TokenTransaction>(
-    `SELECT * FROM token_transactions ${whereClause}
-     ORDER BY created_at DESC
-     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-    [...params, limit, offset],
-  );
+  const transactions = await qb
+    .orderBy("t.created_at", "DESC")
+    .skip(offset)
+    .take(limit)
+    .getMany();
 
   return {
-    transactions,
-    total: parseInt(countResult?.count ?? "0", 10),
+    transactions: transactions as unknown as TokenTransaction[],
+    total,
   };
 }
 
@@ -93,34 +84,32 @@ export async function creditTokens(
   description?: string,
   referenceId?: string,
 ): Promise<{ user: User; transaction: TokenTransaction }> {
-  return transaction(async (client) => {
+  return AppDataSource.transaction(async (manager) => {
     // Update user balance
-    const userResult = await client.query<User>(
-      `UPDATE users
-       SET token_balance = token_balance + $1
-       WHERE id = $2
-       RETURNING *`,
-      [amount, userId],
-    );
+    await manager
+      .createQueryBuilder()
+      .update(UserEntity)
+      .set({ token_balance: () => "token_balance + :amount" })
+      .setParameter("amount", amount)
+      .where("id = :id", { id: userId })
+      .execute();
 
-    if (userResult.rows.length === 0) {
-      throw new Error("User not found");
-    }
-
-    const user = userResult.rows[0];
+    const user = await manager.findOneByOrFail(UserEntity, { id: userId });
 
     // Create transaction record
-    const txResult = await client.query<TokenTransaction>(
-      `INSERT INTO token_transactions (
-        user_id, type, amount, balance_after, description, reference_id
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *`,
-      [userId, "credit", amount, user.token_balance, description, referenceId],
-    );
+    const tx = manager.create(TokenTransactionEntity, {
+      user_id: userId,
+      type: "credit",
+      amount,
+      balance_after: user.token_balance,
+      description: description ?? null,
+      reference_id: referenceId ?? null,
+    });
+    const saved = await manager.save(TokenTransactionEntity, tx);
 
     return {
-      user,
-      transaction: txResult.rows[0],
+      user: user as unknown as User,
+      transaction: saved as unknown as TokenTransaction,
     };
   });
 }
@@ -130,37 +119,37 @@ export async function creditTokens(
  * Same logic as creditTokens but caller owns the transaction.
  */
 export async function creditTokensWithClient(
-  client: pg.PoolClient,
+  manager: EntityManager,
   userId: string,
   amount: number,
   description?: string,
   referenceId?: string,
 ): Promise<{ user: User; transaction: TokenTransaction }> {
-  const userResult = await client.query<User>(
-    `UPDATE users
-     SET token_balance = token_balance + $1
-     WHERE id = $2
-     RETURNING *`,
-    [amount, userId],
-  );
+  // Update user balance
+  await manager
+    .createQueryBuilder()
+    .update(UserEntity)
+    .set({ token_balance: () => "token_balance + :amount" })
+    .setParameter("amount", amount)
+    .where("id = :id", { id: userId })
+    .execute();
 
-  if (userResult.rows.length === 0) {
-    throw new Error("User not found");
-  }
+  const user = await manager.findOneByOrFail(UserEntity, { id: userId });
 
-  const user = userResult.rows[0];
-
-  const txResult = await client.query<TokenTransaction>(
-    `INSERT INTO token_transactions (
-      user_id, type, amount, balance_after, description, reference_id
-    ) VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *`,
-    [userId, "credit", amount, user.token_balance, description, referenceId],
-  );
+  // Create transaction record
+  const tx = manager.create(TokenTransactionEntity, {
+    user_id: userId,
+    type: "credit",
+    amount,
+    balance_after: user.token_balance,
+    description: description ?? null,
+    reference_id: referenceId ?? null,
+  });
+  const saved = await manager.save(TokenTransactionEntity, tx);
 
   return {
-    user,
-    transaction: txResult.rows[0],
+    user: user as unknown as User,
+    transaction: saved as unknown as TokenTransaction,
   };
 }
 
@@ -173,44 +162,47 @@ export async function debitTokens(
   description?: string,
   referenceId?: string,
 ): Promise<{ user: User; transaction: TokenTransaction }> {
-  return transaction(async (client) => {
-    // Check balance first
-    const checkResult = await client.query<{ token_balance: number }>(
-      "SELECT token_balance FROM users WHERE id = $1 FOR UPDATE",
-      [userId],
-    );
+  return AppDataSource.transaction(async (manager) => {
+    // Check balance first with pessimistic locking (FOR UPDATE)
+    const userRow = await manager
+      .createQueryBuilder(UserEntity, "u")
+      .setLock("pessimistic_write")
+      .where("u.id = :id", { id: userId })
+      .getOne();
 
-    if (checkResult.rows.length === 0) {
+    if (!userRow) {
       throw new Error("User not found");
     }
 
-    if (checkResult.rows[0].token_balance < amount) {
+    if (userRow.token_balance < amount) {
       throw new Error("Insufficient token balance");
     }
 
     // Update user balance
-    const userResult = await client.query<User>(
-      `UPDATE users
-       SET token_balance = token_balance - $1
-       WHERE id = $2
-       RETURNING *`,
-      [amount, userId],
-    );
+    await manager
+      .createQueryBuilder()
+      .update(UserEntity)
+      .set({ token_balance: () => "token_balance - :amount" })
+      .setParameter("amount", amount)
+      .where("id = :id", { id: userId })
+      .execute();
 
-    const user = userResult.rows[0];
+    const user = await manager.findOneByOrFail(UserEntity, { id: userId });
 
     // Create transaction record
-    const txResult = await client.query<TokenTransaction>(
-      `INSERT INTO token_transactions (
-        user_id, type, amount, balance_after, description, reference_id
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *`,
-      [userId, "debit", amount, user.token_balance, description, referenceId],
-    );
+    const tx = manager.create(TokenTransactionEntity, {
+      user_id: userId,
+      type: "debit",
+      amount,
+      balance_after: user.token_balance,
+      description: description ?? null,
+      reference_id: referenceId ?? null,
+    });
+    const saved = await manager.save(TokenTransactionEntity, tx);
 
     return {
-      user,
-      transaction: txResult.rows[0],
+      user: user as unknown as User,
+      transaction: saved as unknown as TokenTransaction,
     };
   });
 }
@@ -223,34 +215,32 @@ export async function adjustTokens(
   amount: number, // can be positive or negative
   description?: string,
 ): Promise<{ user: User; transaction: TokenTransaction }> {
-  return transaction(async (client) => {
+  return AppDataSource.transaction(async (manager) => {
     // Update user balance
-    const userResult = await client.query<User>(
-      `UPDATE users
-       SET token_balance = token_balance + $1
-       WHERE id = $2
-       RETURNING *`,
-      [amount, userId],
-    );
+    await manager
+      .createQueryBuilder()
+      .update(UserEntity)
+      .set({ token_balance: () => "token_balance + :amount" })
+      .setParameter("amount", amount)
+      .where("id = :id", { id: userId })
+      .execute();
 
-    if (userResult.rows.length === 0) {
-      throw new Error("User not found");
-    }
-
-    const user = userResult.rows[0];
+    const user = await manager.findOneByOrFail(UserEntity, { id: userId });
 
     // Create transaction record
-    const txResult = await client.query<TokenTransaction>(
-      `INSERT INTO token_transactions (
-        user_id, type, amount, balance_after, description
-      ) VALUES ($1, $2, $3, $4, $5)
-      RETURNING *`,
-      [userId, "adjustment", Math.abs(amount), user.token_balance, description],
-    );
+    const tx = manager.create(TokenTransactionEntity, {
+      user_id: userId,
+      type: "adjustment",
+      amount: Math.abs(amount),
+      balance_after: user.token_balance,
+      description: description ?? null,
+      reference_id: null,
+    });
+    const saved = await manager.save(TokenTransactionEntity, tx);
 
     return {
-      user,
-      transaction: txResult.rows[0],
+      user: user as unknown as User,
+      transaction: saved as unknown as TokenTransaction,
     };
   });
 }
@@ -272,42 +262,38 @@ export async function listAllTransactions(
   const limit = options.limit ?? 50;
   const offset = options.offset ?? 0;
 
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-  let paramIndex = 1;
+  const qb = AppDataSource.createQueryBuilder(TokenTransactionEntity, "t")
+    .leftJoin("t.user", "u")
+    .select("t.id", "id")
+    .addSelect("t.user_id", "user_id")
+    .addSelect("t.type", "type")
+    .addSelect("t.amount", "amount")
+    .addSelect("t.balance_after", "balance_after")
+    .addSelect("t.description", "description")
+    .addSelect("t.reference_id", "reference_id")
+    .addSelect("t.created_at", "created_at")
+    .addSelect("u.email", "user_email")
+    .addSelect("u.name", "user_name");
 
   if (options.type) {
-    conditions.push(`t.type = $${paramIndex}`);
-    params.push(options.type);
-    paramIndex++;
+    qb.andWhere("t.type = :type", { type: options.type });
   }
 
   if (options.userId) {
-    conditions.push(`t.user_id = $${paramIndex}`);
-    params.push(options.userId);
-    paramIndex++;
+    qb.andWhere("t.user_id = :userId", { userId: options.userId });
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const total = await qb.getCount();
 
-  const countResult = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM token_transactions t ${whereClause}`,
-    params,
-  );
-
-  const transactions = await queryAll<TokenTransaction & { user_email: string; user_name: string }>(
-    `SELECT t.*, u.email as user_email, u.name as user_name
-     FROM token_transactions t
-     JOIN users u ON t.user_id = u.id
-     ${whereClause}
-     ORDER BY t.created_at DESC
-     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-    [...params, limit, offset],
-  );
+  const transactions = await qb
+    .orderBy("t.created_at", "DESC")
+    .skip(offset)
+    .take(limit)
+    .getRawMany();
 
   return {
-    transactions,
-    total: parseInt(countResult?.count ?? "0", 10),
+    transactions: transactions as (TokenTransaction & { user_email: string; user_name: string })[],
+    total,
   };
 }
 
