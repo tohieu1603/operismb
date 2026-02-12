@@ -1,9 +1,11 @@
 /**
  * Settings Repository
- * CRUD operations for system settings
+ * CRUD operations for system settings (TypeORM)
  */
 
-import { query, queryOne } from "../connection.js";
+import { In } from "typeorm";
+import { AppDataSource } from "../data-source.js";
+import { SettingEntity } from "../entities/setting.entity.js";
 
 export interface SystemSetting {
   key: string;
@@ -12,11 +14,15 @@ export interface SystemSetting {
   updated_at: Date;
 }
 
+function getRepo() {
+  return AppDataSource.getRepository(SettingEntity);
+}
+
 /**
  * Get a setting by key
  */
 export async function getSetting(key: string): Promise<string | null> {
-  const result = await queryOne<SystemSetting>("SELECT * FROM settings WHERE key = $1", [key]);
+  const result = await getRepo().findOneBy({ key });
   return result?.value ?? null;
 }
 
@@ -26,15 +32,13 @@ export async function getSetting(key: string): Promise<string | null> {
 export async function getSettings(keys: string[]): Promise<Record<string, string>> {
   if (keys.length === 0) return {};
 
-  const placeholders = keys.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await query<SystemSetting>(
-    `SELECT * FROM settings WHERE key IN (${placeholders})`,
-    keys,
-  );
+  const rows = await getRepo().findBy({ key: In(keys) });
 
   const settings: Record<string, string> = {};
-  for (const row of result.rows) {
-    settings[row.key] = row.value;
+  for (const row of rows) {
+    if (row.value !== null) {
+      settings[row.key] = row.value;
+    }
   }
   return settings;
 }
@@ -43,11 +47,7 @@ export async function getSettings(keys: string[]): Promise<Record<string, string
  * Set a setting (upsert)
  */
 export async function setSetting(key: string, value: string): Promise<void> {
-  await query(
-    `INSERT INTO settings (key, value) VALUES ($1, $2)
-     ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-    [key, value],
-  );
+  await getRepo().upsert({ key, value }, ["key"]);
 }
 
 /**
@@ -63,7 +63,7 @@ export async function setSettings(settings: Record<string, string>): Promise<voi
  * Delete a setting
  */
 export async function deleteSetting(key: string): Promise<void> {
-  await query("DELETE FROM settings WHERE key = $1", [key]);
+  await getRepo().delete({ key });
 }
 
 export const settingsRepo = {

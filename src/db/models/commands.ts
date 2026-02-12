@@ -3,34 +3,37 @@
  * CRUD operations for commands_log table
  */
 
-import { query, queryOne, queryAll } from "../connection.js";
+import { AppDataSource } from "../data-source.js";
+import { CommandLogEntity } from "../entities/command-log.entity.js";
 import type { CommandLog, CommandLogCreate, CommandLogUpdate } from "./types.js";
+
+// ============================================================================
+// Repository Helper
+// ============================================================================
+
+function getRepo() {
+  return AppDataSource.getRepository(CommandLogEntity);
+}
+
+// ============================================================================
+// Command Log CRUD
+// ============================================================================
 
 /**
  * Create a new command log entry
  */
 export async function createCommandLog(data: CommandLogCreate): Promise<CommandLog> {
-  const result = await queryOne<CommandLog>(
-    `INSERT INTO commands_log (
-      box_id, agent_id, command_id, command_type,
-      command_payload, metadata
-    ) VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *`,
-    [
-      data.box_id,
-      data.agent_id ?? null,
-      data.command_id,
-      data.command_type,
-      data.command_payload ? JSON.stringify(data.command_payload) : null,
-      JSON.stringify(data.metadata ?? {}),
-    ],
-  );
+  const commandLog = getRepo().create({
+    box_id: data.box_id,
+    agent_id: data.agent_id ?? null,
+    command_id: data.command_id,
+    command_type: data.command_type,
+    command_payload: data.command_payload ?? null,
+    metadata: data.metadata ?? {},
+  });
 
-  if (!result) {
-    throw new Error("Failed to create command log");
-  }
-
-  return result;
+  const result = await getRepo().save(commandLog);
+  return result as unknown as CommandLog;
 }
 
 /**
@@ -40,55 +43,36 @@ export async function updateCommandLog(
   id: string,
   data: CommandLogUpdate,
 ): Promise<CommandLog | null> {
-  const fields: string[] = [];
-  const values: unknown[] = [];
-  let paramIndex = 1;
+  const updateData: Record<string, any> = {};
 
-  if (data.success !== undefined) {
-    fields.push(`success = $${paramIndex++}`);
-    values.push(data.success);
-  }
-  if (data.response_payload !== undefined) {
-    fields.push(`response_payload = $${paramIndex++}`);
-    values.push(JSON.stringify(data.response_payload));
-  }
-  if (data.error !== undefined) {
-    fields.push(`error = $${paramIndex++}`);
-    values.push(data.error);
-  }
-  if (data.received_at !== undefined) {
-    fields.push(`received_at = $${paramIndex++}`);
-    values.push(data.received_at);
-  }
-  if (data.duration_ms !== undefined) {
-    fields.push(`duration_ms = $${paramIndex++}`);
-    values.push(data.duration_ms);
+  if (data.success !== undefined) updateData.success = data.success;
+  if (data.response_payload !== undefined) updateData.response_payload = data.response_payload;
+  if (data.error !== undefined) updateData.error = data.error;
+  if (data.received_at !== undefined) updateData.received_at = data.received_at;
+  if (data.duration_ms !== undefined) updateData.duration_ms = data.duration_ms;
+
+  if (Object.keys(updateData).length === 0) {
+    return getCommandLogById(id);
   }
 
-  if (fields.length === 0) {
-    return queryOne<CommandLog>("SELECT * FROM commands_log WHERE id = $1", [id]);
-  }
-
-  values.push(id);
-
-  return queryOne<CommandLog>(
-    `UPDATE commands_log SET ${fields.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
-    values,
-  );
+  await getRepo().update({ id }, updateData);
+  return getCommandLogById(id);
 }
 
 /**
  * Get command log by ID
  */
 export async function getCommandLogById(id: string): Promise<CommandLog | null> {
-  return queryOne<CommandLog>("SELECT * FROM commands_log WHERE id = $1", [id]);
+  const result = await getRepo().findOneBy({ id });
+  return result as unknown as CommandLog | null;
 }
 
 /**
  * Get command log by command_id (protocol ID)
  */
 export async function getCommandLogByCommandId(commandId: string): Promise<CommandLog | null> {
-  return queryOne<CommandLog>("SELECT * FROM commands_log WHERE command_id = $1", [commandId]);
+  const result = await getRepo().findOneBy({ command_id: commandId });
+  return result as unknown as CommandLog | null;
 }
 
 /**
@@ -105,35 +89,28 @@ export async function listCommandsByBox(
 ): Promise<{ commands: CommandLog[]; total: number }> {
   const limit = options?.limit ?? 100;
   const offset = options?.offset ?? 0;
-  const params: unknown[] = [boxId];
 
-  let whereClause = "WHERE box_id = $1";
+  const queryBuilder = getRepo()
+    .createQueryBuilder("c")
+    .where("c.box_id = :boxId", { boxId });
 
   if (options?.commandType) {
-    whereClause += ` AND command_type = $${params.length + 1}`;
-    params.push(options.commandType);
+    queryBuilder.andWhere("c.command_type = :commandType", { commandType: options.commandType });
   }
 
   if (options?.since) {
-    whereClause += ` AND sent_at >= $${params.length + 1}`;
-    params.push(options.since);
+    queryBuilder.andWhere("c.sent_at >= :since", { since: options.since });
   }
 
-  const countResult = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM commands_log ${whereClause}`,
-    params,
-  );
-
-  const commands = await queryAll<CommandLog>(
-    `SELECT * FROM commands_log ${whereClause}
-     ORDER BY sent_at DESC
-     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-    [...params, limit, offset],
-  );
+  const [commands, total] = await queryBuilder
+    .orderBy("c.sent_at", "DESC")
+    .skip(offset)
+    .take(limit)
+    .getManyAndCount();
 
   return {
-    commands,
-    total: parseInt(countResult?.count ?? "0", 10),
+    commands: commands as unknown as CommandLog[],
+    total,
   };
 }
 
@@ -150,13 +127,14 @@ export async function listCommandsByAgent(
   const limit = options?.limit ?? 100;
   const offset = options?.offset ?? 0;
 
-  return queryAll<CommandLog>(
-    `SELECT * FROM commands_log
-     WHERE agent_id = $1
-     ORDER BY sent_at DESC
-     LIMIT $2 OFFSET $3`,
-    [agentId, limit, offset],
-  );
+  const commands = await getRepo().find({
+    where: { agent_id: agentId },
+    order: { sent_at: "DESC" },
+    skip: offset,
+    take: limit,
+  });
+
+  return commands as unknown as CommandLog[];
 }
 
 /**
@@ -174,29 +152,24 @@ export async function getCommandStats(
 }> {
   const sinceDate = since ?? new Date(Date.now() - 24 * 60 * 60 * 1000); // Default: last 24 hours
 
-  const statsResult = await queryOne<{
-    total: string;
-    success: string;
-    failure: string;
-    avg_duration: string;
-  }>(
-    `SELECT
-      COUNT(*) as total,
-      COUNT(*) FILTER (WHERE success = true) as success,
-      COUNT(*) FILTER (WHERE success = false) as failure,
-      COALESCE(AVG(duration_ms) FILTER (WHERE duration_ms IS NOT NULL), 0) as avg_duration
-     FROM commands_log
-     WHERE box_id = $1 AND sent_at >= $2`,
-    [boxId, sinceDate],
-  );
+  const stats = await getRepo()
+    .createQueryBuilder("c")
+    .select("COUNT(*)", "total")
+    .addSelect("COUNT(*) FILTER (WHERE c.success = true)", "success")
+    .addSelect("COUNT(*) FILTER (WHERE c.success = false)", "failure")
+    .addSelect("COALESCE(AVG(c.duration_ms) FILTER (WHERE c.duration_ms IS NOT NULL), 0)", "avg_duration")
+    .where("c.box_id = :boxId", { boxId })
+    .andWhere("c.sent_at >= :since", { since: sinceDate })
+    .getRawOne();
 
-  const byTypeResult = await queryAll<{ command_type: string; count: string }>(
-    `SELECT command_type, COUNT(*) as count
-     FROM commands_log
-     WHERE box_id = $1 AND sent_at >= $2
-     GROUP BY command_type`,
-    [boxId, sinceDate],
-  );
+  const byTypeResult = await getRepo()
+    .createQueryBuilder("c")
+    .select("c.command_type", "command_type")
+    .addSelect("COUNT(*)", "count")
+    .where("c.box_id = :boxId", { boxId })
+    .andWhere("c.sent_at >= :since", { since: sinceDate })
+    .groupBy("c.command_type")
+    .getRawMany();
 
   const byType: Record<string, number> = {};
   for (const row of byTypeResult) {
@@ -204,10 +177,10 @@ export async function getCommandStats(
   }
 
   return {
-    total: parseInt(statsResult?.total ?? "0", 10),
-    success: parseInt(statsResult?.success ?? "0", 10),
-    failure: parseInt(statsResult?.failure ?? "0", 10),
-    avgDurationMs: parseFloat(statsResult?.avg_duration ?? "0"),
+    total: parseInt(stats?.total ?? "0", 10),
+    success: parseInt(stats?.success ?? "0", 10),
+    failure: parseInt(stats?.failure ?? "0", 10),
+    avgDurationMs: parseFloat(stats?.avg_duration ?? "0"),
     byType,
   };
 }
@@ -217,12 +190,14 @@ export async function getCommandStats(
  * (for cleanup/retention policy)
  */
 export async function deleteOldCommands(olderThanDays: number = 90): Promise<number> {
-  const result = await query(
-    `DELETE FROM commands_log
-     WHERE sent_at < NOW() - $1 * INTERVAL '1 day'`,
-    [olderThanDays],
-  );
-  return result.rowCount ?? 0;
+  const result = await getRepo()
+    .createQueryBuilder()
+    .delete()
+    .from(CommandLogEntity)
+    .where(`sent_at < NOW() - :days * INTERVAL '1 day'`, { days: olderThanDays })
+    .execute();
+
+  return result.affected ?? 0;
 }
 
 export default {

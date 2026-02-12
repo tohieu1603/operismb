@@ -3,6 +3,7 @@
  */
 
 import type { ValidationResult } from "./common.validator.js";
+import { escapeHtml } from "../utils/sanitize.util.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -89,7 +90,7 @@ export function validateRegister(body: unknown): ValidationResult<RegisterDTO> {
     data: {
       email: (email as string).trim().toLowerCase(),
       password: password as string,
-      name: (name as string).trim(),
+      name: escapeHtml((name as string).trim()),
     },
   };
 }
@@ -254,7 +255,7 @@ export function validateCreateUser(body: unknown): ValidationResult<CreateUserDT
     data: {
       email: (email as string).trim().toLowerCase(),
       password: password as string,
-      name: (name as string).trim(),
+      name: escapeHtml((name as string).trim()),
       ...(role !== undefined && { role: role as "admin" | "user" }),
       ...(is_active !== undefined && { is_active: is_active as boolean }),
       ...(token_balance !== undefined && { token_balance: token_balance as number }),
