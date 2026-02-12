@@ -13,3 +13,4 @@ export { default as cronRoutes } from "./cron.routes.js";
 export { default as gatewayProxyRoutes } from "./gateway-proxy.routes.js";
 export { default as analyticsRoutes } from "./analytics.routes.js";
 export { default as tokenVaultRoutes } from "./token-vault.routes.js";
+export { default as gatewayRegisterRoutes } from "./gateway-register.routes.js";

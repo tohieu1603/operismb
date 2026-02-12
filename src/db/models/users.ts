@@ -10,18 +10,36 @@ import type { User, UserCreate, UserUpdate } from "./types.js";
  * Create a new user
  */
 export async function createUser(data: UserCreate): Promise<User> {
+  // Build columns dynamically: required + optional fields
+  const columns: string[] = ["email", "password_hash", "name", "role", "token_balance"];
+  const values: unknown[] = [
+    data.email.toLowerCase(),
+    data.password_hash,
+    data.name,
+    data.role ?? "user",
+    data.token_balance ?? 1000000,
+  ];
+
+  const optionalFields: Array<[string, unknown]> = [
+    ["is_active", data.is_active],
+    ["unique_machine", data.unique_machine],
+    ["gateway_url", data.gateway_url],
+    ["gateway_token", data.gateway_token],
+    ["gateway_hooks_token", data.gateway_hooks_token],
+    ["auth_profiles_path", data.auth_profiles_path],
+  ];
+
+  for (const [col, val] of optionalFields) {
+    if (val !== undefined) {
+      columns.push(col);
+      values.push(val);
+    }
+  }
+
+  const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
   const result = await queryOne<User>(
-    `INSERT INTO users (
-      email, password_hash, name, role, token_balance
-    ) VALUES ($1, $2, $3, $4, $5)
-    RETURNING *`,
-    [
-      data.email.toLowerCase(),
-      data.password_hash,
-      data.name,
-      data.role ?? "user",
-      data.token_balance ?? 1000000,
-    ],
+    `INSERT INTO users (${columns.join(", ")}) VALUES (${placeholders}) RETURNING *`,
+    values,
   );
 
   if (!result) {
@@ -29,6 +47,13 @@ export async function createUser(data: UserCreate): Promise<User> {
   }
 
   return result;
+}
+
+/**
+ * Get user by unique_machine
+ */
+export async function getUserByMachine(machine: string): Promise<User | null> {
+  return queryOne<User>("SELECT * FROM users WHERE unique_machine = $1", [machine]);
 }
 
 /**
@@ -88,6 +113,14 @@ export async function updateUser(id: string, data: UserUpdate): Promise<User | n
   if (data.gateway_token !== undefined) {
     fields.push(`gateway_token = $${paramIndex++}`);
     values.push(data.gateway_token);
+  }
+  if (data.gateway_hooks_token !== undefined) {
+    fields.push(`gateway_hooks_token = $${paramIndex++}`);
+    values.push(data.gateway_hooks_token);
+  }
+  if (data.unique_machine !== undefined) {
+    fields.push(`unique_machine = $${paramIndex++}`);
+    values.push(data.unique_machine);
   }
   if (data.auth_profiles_path !== undefined) {
     fields.push(`auth_profiles_path = $${paramIndex++}`);
@@ -197,6 +230,7 @@ export default {
   createUser,
   getUserById,
   getUserByEmail,
+  getUserByMachine,
   updateUser,
   deleteUser,
   listUsers,

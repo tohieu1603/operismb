@@ -8,10 +8,11 @@
  */
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { settingsRepo } from "../db/models/settings.js";
-import { getUserById } from "../db/models/users.js";
+import { getUserById, updateUser } from "../db/models/users.js";
 
 const SETTINGS_KEY = "anthropic_oauth_tokens";
 const ALGORITHM = "aes-256-gcm";
@@ -19,7 +20,7 @@ const ALGORITHM = "aes-256-gcm";
 // Default path; override via AUTH_PROFILES_PATH env var
 function getAuthProfilesPath(): string {
   return process.env.AUTH_PROFILES_PATH
-    || path.join(process.env.HOME || "/root", ".openclaw/agents/main/agent/auth-profiles.json");
+    || path.join(os.homedir(), ".openclaw/agents/main/agent/auth-profiles.json");
 }
 
 function decrypt(blob: string): string {
@@ -133,6 +134,16 @@ export async function clearAuthProfiles(userAuthProfilesPath?: string | null): P
 // ============================================
 
 const GATEWAY_PUSH_TIMEOUT_MS = 10_000;
+const REGISTER_SECRET = process.env.GATEWAY_REGISTER_SECRET || "operis-gateway-register-secret";
+// operis-api public URL for gateway callback (gateway → operis-api PUT /gateway/register)
+function getOperisApiUrl(): string {
+  const raw = process.env.OPERIS_API_URL || "http://127.0.0.1:3025";
+  // Auto-add https:// if user forgot the protocol
+  if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
+    return `https://${raw}`;
+  }
+  return raw;
+}
 
 /** Build auth-profiles JSON from vault tokens */
 async function buildAuthProfilesJson(): Promise<{
@@ -201,17 +212,54 @@ async function callGatewayHook(
 }
 
 /**
+ * Read gateway config from local openclaw.json
+ * Both operis-api and openclaw run on the same client machine
+ */
+function readLocalGatewayConfig(): { gatewayUrl: string; gatewayToken: string; hooksToken: string } | null {
+  const configPath = process.env.OPENCLAW_CONFIG_PATH
+    || path.join(os.homedir(), ".openclaw/openclaw.json");
+  try {
+    const raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    const gatewayToken = raw.gateway?.auth?.token || raw.env?.vars?.GATEWAY_TOKEN || "";
+    const hooksToken = raw.hooks?.token || "";
+    const port = raw.gateway?.port || 3000;
+    const bind = raw.gateway?.bind === "loopback" ? "127.0.0.1" : "0.0.0.0";
+    if (!gatewayToken && !hooksToken) return null;
+    return { gatewayUrl: `http://${bind}:${port}`, gatewayToken, hooksToken };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Push auth-profiles to user's gateway on login
- * Server → POST gateway_url/hooks/sync-auth-profiles { authProfiles: {...} }
- * Gateway writes to local auth-profiles.json
+ * 1. Read local openclaw.json → update gateway tokens in DB
+ * 2. POST gateway_url/hooks/sync-auth-profiles { authProfiles }
  * Non-blocking, logs errors
  */
 export async function pushAuthProfilesToGateway(userId: string): Promise<void> {
   try {
+    // Step 1: Check if user already has a remote gateway configured
     const user = await getUserById(userId);
-    // Use hooks token if available, fall back to gateway token
-    const hooksToken = user?.gateway_hooks_token || user?.gateway_token;
-    if (!user?.gateway_url || !hooksToken) {
+
+    // Only read local openclaw.json if user has NO gateway_url in DB (co-located setup)
+    // Remote users already have their own gateway_url — don't overwrite with local config
+    if (!user?.gateway_url) {
+      const gwConfig = readLocalGatewayConfig();
+      if (gwConfig) {
+        await updateUser(userId, {
+          gateway_url: gwConfig.gatewayUrl,
+          gateway_token: gwConfig.gatewayToken,
+          gateway_hooks_token: gwConfig.hooksToken,
+        });
+        console.log(`[auth-sync] Updated gateway config from local openclaw.json → ${gwConfig.gatewayUrl}`);
+      }
+    }
+
+    // Step 2: Re-read user (with possibly updated tokens) and push auth-profiles
+    const freshUser = await getUserById(userId);
+    const hooksToken = freshUser?.gateway_hooks_token || freshUser?.gateway_token;
+    if (!freshUser?.gateway_url || !hooksToken) {
       console.log("[auth-sync] No gateway configured for user, skipping push");
       return;
     }
@@ -222,15 +270,22 @@ export async function pushAuthProfilesToGateway(userId: string): Promise<void> {
       return;
     }
 
+    // Include callback so gateway calls back PUT /gateway/register with its real token
+    const callback = {
+      url: `${getOperisApiUrl()}/api/gateway/register`,
+      email: freshUser.email,
+      secret: REGISTER_SECRET,
+    };
+
     const ok = await callGatewayHook(
-      user.gateway_url,
+      freshUser.gateway_url,
       hooksToken,
       "sync-auth-profiles",
-      { authProfiles },
+      { authProfiles, callback },
     );
 
     if (ok) {
-      console.log(`[auth-sync] Pushed ${Object.keys(authProfiles.profiles).length} profile(s) to gateway`);
+      console.log(`[auth-sync] Pushed ${Object.keys(authProfiles.profiles).length} profile(s) to gateway (with callback)`);
     }
   } catch (err) {
     console.error("[auth-sync] pushAuthProfilesToGateway failed:", err);

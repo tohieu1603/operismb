@@ -13,9 +13,9 @@
 
 import { Router } from "express";
 import { authController } from "../controllers/auth.controller.js";
-import { authMiddleware, optionalAuthMiddleware, asyncHandler } from "../middleware/index.js";
+import { authMiddleware, optionalAuthMiddleware, adminMiddleware, asyncHandler } from "../middleware/index.js";
 import { validateBody } from "../middleware/validate.middleware.js";
-import { validateRegister, validateLogin, validateRefresh } from "../validators/auth.validator.js";
+import { validateRegister, validateLogin, validateRefresh, validateChangePassword, validateCreateUser } from "../validators/auth.validator.js";
 
 const router = Router();
 
@@ -358,74 +358,34 @@ router.get(
 );
 
 /**
- * @swagger
- * /auth/me/gateway:
- *   patch:
- *     tags: [Auth]
- *     summary: Cập nhật gateway configuration
- *     description: |
- *       User tự cập nhật gateway_url và gateway_token của mình.
- *
- *       **Use case:** Sau khi đăng nhập, frontend gọi endpoint này
- *       để cấu hình gateway cho user.
- *
- *       **Gửi `null` để xóa giá trị hiện tại.**
- *
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               gateway_url:
- *                 type: string
- *                 nullable: true
- *                 description: URL của Moltbot gateway
- *                 example: "http://localhost:18789"
- *               gateway_token:
- *                 type: string
- *                 nullable: true
- *                 description: Authentication token cho gateway
- *                 example: "gw_abc123xyz"
- *           examples:
- *             updateBoth:
- *               summary: Cập nhật cả URL và token
- *               value:
- *                 gateway_url: "http://localhost:18789"
- *                 gateway_token: "gw_abc123xyz"
- *             updateTokenOnly:
- *               summary: Chỉ cập nhật token
- *               value:
- *                 gateway_token: "gw_new_token_456"
- *             clearGateway:
- *               summary: Xóa cấu hình gateway
- *               value:
- *                 gateway_url: null
- *                 gateway_token: null
- *
- *     responses:
- *       200:
- *         description: Cập nhật thành công
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/User'
- *
- *       401:
- *         description: Chưa đăng nhập hoặc token hết hạn
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *
- *     security:
- *       - BearerAuth: []
+ * POST /auth/change-password
+ * Change password for the current user
+ * Requires: valid JWT
+ * Body: { currentPassword, newPassword }
  */
-router.patch(
-  "/me/gateway",
+router.post(
+  "/change-password",
   authMiddleware,
-  asyncHandler((req, res) => authController.updateGateway(req, res)),
+  validateBody(validateChangePassword),
+  asyncHandler((req, res) => authController.changePassword(req, res)),
+);
+
+// =============================================================================
+// ADMIN ROUTES - Yêu cầu admin role
+// =============================================================================
+
+/**
+ * POST /auth/users
+ * Admin: create a new user account
+ * Requires: admin JWT
+ * Body: { email, password, name, role?, token_balance?, unique_machine? }
+ */
+router.post(
+  "/users",
+  authMiddleware,
+  adminMiddleware,
+  validateBody(validateCreateUser),
+  asyncHandler((req, res) => authController.createUser(req, res)),
 );
 
 export default router;
