@@ -235,6 +235,7 @@ export async function listAllDeposits(
     id: row.d_id,
     user_id: row.d_user_id,
     order_code: row.d_order_code,
+    type: row.d_type as DepositType,
     token_amount: row.d_token_amount,
     amount_vnd: row.d_amount_vnd,
     status: row.d_status,

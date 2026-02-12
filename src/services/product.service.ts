@@ -64,7 +64,7 @@ class ProductService {
     }
 
     // Check slug uniqueness
-    const existing = await productsRepo.getProductBySlug(data.slug);
+    const existing = await productsRepo.getProductBySlug(data.slug!);
     if (existing) throw Errors.conflict("Product with this slug already exists");
 
     const product = await productsRepo.createProduct(data);
