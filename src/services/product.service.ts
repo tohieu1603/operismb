@@ -13,6 +13,10 @@ import type {
   ProductUpdate,
 } from "../db/models/products.js";
 
+/** Allowed product categories */
+export const PRODUCT_CATEGORIES = ["personal", "enterprise"] as const;
+export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
+
 class ProductService {
   async listProducts(opts: ProductListOptions = {}): Promise<{
     products: Product[];
@@ -52,12 +56,20 @@ class ProductService {
   }
 
   async getCategories(): Promise<string[]> {
-    return productsRepo.getCategories();
+    return [...PRODUCT_CATEGORIES];
   }
 
   // ── Admin CRUD ──────────────────────────────────────────────────────
 
+  private validateCategory(category?: string): void {
+    if (category && !PRODUCT_CATEGORIES.includes(category as ProductCategory)) {
+      throw Errors.badRequest(`Invalid category '${category}'. Must be one of: ${PRODUCT_CATEGORIES.join(", ")}`);
+    }
+  }
+
   async createProduct(data: ProductCreate): Promise<ProductWithRelations> {
+    this.validateCategory(data.category);
+
     // Auto-generate slug from name if not provided
     if (!data.slug) {
       data.slug = slugify(data.name, { lower: true, strict: true, locale: "vi" });
@@ -79,6 +91,7 @@ class ProductService {
   }
 
   async updateProduct(id: string, data: ProductUpdate): Promise<ProductWithRelations> {
+    this.validateCategory(data.category);
     const product = await productsRepo.updateProduct(id, data);
     if (!product) throw Errors.notFound("Product");
 

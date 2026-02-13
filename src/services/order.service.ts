@@ -320,6 +320,87 @@ class OrderService {
     await ordersRepo.updateOrderStatus(order.id, "processing");
     console.log(`[order] Order ${order.id} marked as processing after payment`);
   }
+
+  // ── Admin ──────────────────────────────────────────────────────────────
+
+  /** Valid status transitions for admin updates */
+  private static STATUS_TRANSITIONS: Record<string, OrderStatus[]> = {
+    pending: ["processing", "cancelled"],
+    processing: ["shipping", "cancelled"],
+    shipping: ["delivered"],
+  };
+
+  /**
+   * Admin: list all orders with user info
+   */
+  async adminGetAllOrders(
+    page: number,
+    limit: number,
+    status?: OrderStatus,
+    userId?: string,
+    search?: string,
+  ) {
+    const result = await ordersRepo.listAllOrders({
+      limit,
+      offset: (page - 1) * limit,
+      status,
+      userId,
+      search,
+    });
+
+    return {
+      orders: result.orders,
+      total: result.total,
+      page,
+      limit,
+      totalPages: Math.ceil(result.total / limit),
+    };
+  }
+
+  /**
+   * Admin: update order status with transition validation
+   * If cancelled → restore stock + cancel linked deposit
+   */
+  async adminUpdateOrderStatus(orderId: string, newStatus: OrderStatus) {
+    const order = await ordersRepo.getOrderById(orderId);
+    if (!order) throw Errors.notFound("Order");
+
+    // Resolve lazy-expiry first
+    const currentStatus = await this.resolveOrderStatus(order);
+
+    // Validate transition
+    const allowed = OrderService.STATUS_TRANSITIONS[currentStatus];
+    if (!allowed || !allowed.includes(newStatus)) {
+      throw Errors.badRequest(
+        `Cannot transition from '${currentStatus}' to '${newStatus}'. Allowed: ${allowed?.join(", ") ?? "none"}`,
+      );
+    }
+
+    // If cancelling, restore stock + cancel deposit (same logic as cancelOrder)
+    if (newStatus === "cancelled") {
+      await ordersRepo.updateOrderStatus(orderId, "cancelled");
+
+      if (order.deposit_order_id) {
+        await depositsRepo.updateDepositOrderStatus(order.deposit_order_id, "cancelled");
+      }
+
+      const { query: dbQuery } = await import("../db/connection.js");
+      const items = await ordersRepo.getOrderItems(orderId);
+      for (const item of items) {
+        await dbQuery(
+          "UPDATE products SET stock = stock + $1 WHERE slug = $2",
+          [item.quantity, item.product_slug],
+        );
+      }
+    } else {
+      await ordersRepo.updateOrderStatus(orderId, newStatus);
+    }
+
+    // Return full updated order with items
+    const updated = await ordersRepo.getOrderById(orderId);
+    const items = await ordersRepo.getOrderItems(orderId);
+    return { ...updated, items };
+  }
 }
 
 export const orderService = new OrderService();

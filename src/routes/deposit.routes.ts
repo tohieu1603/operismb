@@ -25,6 +25,7 @@ import {
   getTokenHistory,
   adminUpdateTokens,
   adminGetAllDeposits,
+  adminUpdatePricing,
   sepayWebhook,
 } from "../controllers/deposit.controller.js";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware.js";
@@ -766,5 +767,43 @@ depositRoutes.get("/admin/all", adminMiddleware, adminGetAllDeposits);
  *       - BearerAuth: []
  */
 depositRoutes.post("/admin/tokens", adminMiddleware, adminUpdateTokens);
+
+/**
+ * @swagger
+ * /deposits/admin/pricing:
+ *   put:
+ *     tags: [Deposits - Admin]
+ *     summary: "[Admin] Cập nhật bảng giá deposit"
+ *     description: |
+ *       Cập nhật toàn bộ bảng giá token packages.
+ *       Dữ liệu lưu trong settings table, GET /deposits/pricing sẽ đọc từ đây.
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [packages]
+ *             properties:
+ *               packages:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [id, name, tokens, bonus, popular]
+ *                   properties:
+ *                     id: { type: string }
+ *                     name: { type: string }
+ *                     tokens: { type: integer, minimum: 1 }
+ *                     bonus: { type: integer, minimum: 0 }
+ *                     popular: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Bảng giá đã cập nhật (same format as GET /deposits/pricing)
+ *       400:
+ *         description: Dữ liệu không hợp lệ
+ */
+depositRoutes.put("/admin/pricing", adminMiddleware, adminUpdatePricing);
 
 export default depositRoutes;

@@ -4,7 +4,7 @@
  */
 
 import { Errors } from "../core/errors/api-error.js";
-import { depositsRepo, usersRepo } from "../db/index.js";
+import { depositsRepo, usersRepo, settingsRepo } from "../db/index.js";
 import { AppDataSource } from "../db/data-source.js";
 import { creditTokensWithClient } from "../db/models/token-transactions.js";
 import { tokenService } from "./token.service.js";
@@ -397,10 +397,22 @@ class DepositService {
     };
   }
 
+  // ── Pricing ────────────────────────────────────────────────────────────
+
+  /** Default packages used when no custom pricing is stored in settings */
+  private static DEFAULT_PACKAGES = [
+    { id: "starter", name: "Starter", tokens: 100000, bonus: 0, popular: false },
+    { id: "basic", name: "Basic", tokens: 500000, bonus: 0, popular: false },
+    { id: "standard", name: "Standard", tokens: 1000000, bonus: 50000, popular: true },
+    { id: "pro", name: "Pro", tokens: 2000000, bonus: 150000, popular: false },
+    { id: "business", name: "Business", tokens: 5000000, bonus: 500000, popular: false },
+    { id: "enterprise", name: "Enterprise", tokens: 10000000, bonus: 1500000, popular: false },
+  ];
+
   /**
-   * Get pricing info with packages
+   * Get pricing info with packages (reads from settings, falls back to defaults)
    */
-  getPricingInfo(): {
+  async getPricingInfo(): Promise<{
     pricePerMillion: number;
     currency: string;
     minimumTokens: number;
@@ -413,15 +425,18 @@ class DepositService {
       bonus: number;
       popular: boolean;
     }>;
-  } {
-    const packages = [
-      { id: "starter", name: "Starter", tokens: 100000, bonus: 0, popular: false },
-      { id: "basic", name: "Basic", tokens: 500000, bonus: 0, popular: false },
-      { id: "standard", name: "Standard", tokens: 1000000, bonus: 50000, popular: true },
-      { id: "pro", name: "Pro", tokens: 2000000, bonus: 150000, popular: false },
-      { id: "business", name: "Business", tokens: 5000000, bonus: 500000, popular: false },
-      { id: "enterprise", name: "Enterprise", tokens: 10000000, bonus: 1500000, popular: false },
-    ];
+  }> {
+    // Try to load custom pricing from settings
+    const stored = await settingsRepo.getSetting("deposit_pricing");
+    let packages = DepositService.DEFAULT_PACKAGES;
+
+    if (stored) {
+      try {
+        packages = JSON.parse(stored);
+      } catch {
+        // Fall back to defaults on invalid JSON
+      }
+    }
 
     return {
       pricePerMillion: depositsRepo.TOKEN_PRICE_VND,
@@ -433,6 +448,35 @@ class DepositService {
         priceVnd: depositsRepo.calculateVndFromTokens(pkg.tokens),
       })),
     };
+  }
+
+  /**
+   * Admin: Update deposit pricing packages
+   */
+  async updatePricing(
+    packages: Array<{
+      id: string;
+      name: string;
+      tokens: number;
+      bonus: number;
+      popular: boolean;
+    }>,
+  ) {
+    // Validate packages
+    for (const pkg of packages) {
+      if (!pkg.id || !pkg.name) throw Errors.badRequest("Each package must have id and name");
+      if (pkg.tokens <= 0) throw Errors.badRequest(`Package '${pkg.id}': tokens must be > 0`);
+      if (pkg.bonus < 0) throw Errors.badRequest(`Package '${pkg.id}': bonus must be >= 0`);
+    }
+
+    // Check for duplicate IDs
+    const ids = packages.map((p) => p.id);
+    if (new Set(ids).size !== ids.length) {
+      throw Errors.badRequest("Package IDs must be unique");
+    }
+
+    await settingsRepo.setSetting("deposit_pricing", JSON.stringify(packages));
+    return this.getPricingInfo();
   }
 }
 
