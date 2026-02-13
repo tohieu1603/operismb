@@ -11,7 +11,7 @@ import type { DepositType } from "../db/models/deposits";
  */
 export async function getPricing(_req: Request, res: Response, next: NextFunction) {
   try {
-    const pricing = depositService.getPricingInfo();
+    const pricing = await depositService.getPricingInfo();
     res.json(pricing);
   } catch (error) {
     next(error);
@@ -30,7 +30,7 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
     if (type === "token") {
       // Resolve tierId to tokenAmount if provided
       if (!tokenAmount && tierId) {
-        const pricing = depositService.getPricingInfo();
+        const pricing = await depositService.getPricingInfo();
         const pkg = pricing.packages.find((p) => p.id === tierId);
         if (!pkg) {
           res.status(400).json({ error: `Invalid tierId: ${tierId}`, code: "BAD_REQUEST" });
@@ -178,6 +178,24 @@ export async function adminUpdateTokens(req: Request, res: Response, next: NextF
     const { userId, amount, reason } = req.body;
 
     const result = await depositService.adminUpdateTokens(adminUserId, userId, amount, reason);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Admin: Update deposit pricing packages
+ */
+export async function adminUpdatePricing(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { packages } = req.body;
+    if (!Array.isArray(packages) || packages.length === 0) {
+      res.status(400).json({ error: "packages array is required", code: "BAD_REQUEST" });
+      return;
+    }
+
+    const result = await depositService.updatePricing(packages);
     res.json(result);
   } catch (error) {
     next(error);

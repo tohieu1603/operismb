@@ -4,7 +4,7 @@
  */
 
 import { Errors } from "../core/errors/api-error";
-import { depositsRepo, usersRepo } from "../db/index";
+import { depositsRepo, usersRepo, settingsRepo } from "../db/index";
 import { AppDataSource } from "../db/data-source";
 import { creditTokensWithClient } from "../db/models/token-transactions";
 import { tokenService } from "./token.service";
@@ -54,7 +54,10 @@ class DepositService {
    * Create a new deposit order (or return existing pending order)
    * Prevents spam by returning existing pending order if one exists
    */
-  async createDeposit(userId: string, input: CreateDepositInput): Promise<DepositOrderResponse> {
+  async createDeposit(
+    userId: string,
+    input: CreateDepositInput,
+  ): Promise<DepositOrderResponse> {
     const user = await usersRepo.getUserById(userId);
     if (!user) throw Errors.notFound("User");
     if (!user.is_active) throw Errors.accountDeactivated();
@@ -64,21 +67,32 @@ class DepositService {
     let amountVnd: number;
 
     if (isToken) {
-      if (!input.tokenAmount) throw Errors.badRequest("tokenAmount is required for token deposits");
-      if (input.tokenAmount < 100000) throw Errors.badRequest("Minimum deposit is 100,000 tokens");
+      if (!input.tokenAmount)
+        throw Errors.badRequest("tokenAmount is required for token deposits");
+      if (input.tokenAmount < 100000)
+        throw Errors.badRequest("Minimum deposit is 100,000 tokens");
       tokenAmount = input.tokenAmount;
       amountVnd = depositsRepo.calculateVndFromTokens(tokenAmount);
     } else {
-      if (!input.amountVnd) throw Errors.badRequest("amountVnd is required for order payments");
-      if (input.amountVnd < 1000) throw Errors.badRequest("Minimum amount is 1,000 VND");
+      if (!input.amountVnd)
+        throw Errors.badRequest("amountVnd is required for order payments");
+      if (input.amountVnd < 1000)
+        throw Errors.badRequest("Minimum amount is 1,000 VND");
       tokenAmount = 0;
       amountVnd = input.amountVnd;
     }
 
     // Check for existing pending order of same type (prevent spam)
-    const existingOrders = await depositsRepo.getUserDepositOrders(userId, 10, 0);
+    const existingOrders = await depositsRepo.getUserDepositOrders(
+      userId,
+      10,
+      0,
+    );
     const pendingOrder = existingOrders.find(
-      (o) => o.type === input.type && o.status === "pending" && new Date(o.expires_at) > new Date(),
+      (o) =>
+        o.type === input.type &&
+        o.status === "pending" &&
+        new Date(o.expires_at) > new Date(),
     );
 
     if (pendingOrder) {
@@ -112,7 +126,10 @@ class DepositService {
   /**
    * Get current pending order for user (for retry payment)
    */
-  async getPendingOrder(userId: string, type?: DepositType): Promise<DepositOrderResponse | null> {
+  async getPendingOrder(
+    userId: string,
+    type?: DepositType,
+  ): Promise<DepositOrderResponse | null> {
     const orders = await depositsRepo.getUserDepositOrders(userId, 10, 0, type);
     const pendingOrder = orders.find(
       (o) => o.status === "pending" && new Date(o.expires_at) > new Date(),
@@ -125,9 +142,15 @@ class DepositService {
   /**
    * Cancel pending order (allows creating new one)
    */
-  async cancelPendingOrder(userId: string, orderId: string): Promise<{ success: boolean }> {
+  async cancelPendingOrder(
+    userId: string,
+    orderId: string,
+  ): Promise<{ success: boolean }> {
     // Anti-IDOR: query scoped to userId
-    const order = await depositsRepo.getDepositOrderByIdAndUser(orderId, userId);
+    const order = await depositsRepo.getDepositOrderByIdAndUser(
+      orderId,
+      userId,
+    );
     if (!order) throw Errors.notFound("Deposit order");
     if (order.status !== "pending") {
       throw Errors.badRequest("Only pending orders can be cancelled");
@@ -140,9 +163,15 @@ class DepositService {
   /**
    * Get deposit order by ID (scoped to user)
    */
-  async getDeposit(userId: string, depositId: string): Promise<DepositOrderResponse> {
+  async getDeposit(
+    userId: string,
+    depositId: string,
+  ): Promise<DepositOrderResponse> {
     // Anti-IDOR: query scoped to userId
-    const order = await depositsRepo.getDepositOrderByIdAndUser(depositId, userId);
+    const order = await depositsRepo.getDepositOrderByIdAndUser(
+      depositId,
+      userId,
+    );
     if (!order) throw Errors.notFound("Deposit order");
 
     return this.formatDepositResponse(order);
@@ -157,7 +186,12 @@ class DepositService {
     offset = 0,
     type?: DepositType,
   ): Promise<{ orders: DepositOrderResponse[]; total: number }> {
-    const orders = await depositsRepo.getUserDepositOrders(userId, limit, offset, type);
+    const orders = await depositsRepo.getUserDepositOrders(
+      userId,
+      limit,
+      offset,
+      type,
+    );
     return {
       orders: orders.map((o) => this.formatDepositResponse(o)),
       total: orders.length,
@@ -172,7 +206,11 @@ class DepositService {
     limit = 50,
     offset = 0,
   ): Promise<{ transactions: TokenHistoryItem[]; total: number }> {
-    const transactions = await tokenService.getTransactionHistory(userId, limit, offset);
+    const transactions = await tokenService.getTransactionHistory(
+      userId,
+      limit,
+      offset,
+    );
     return {
       transactions: transactions.map((t) => ({
         id: t.id,
@@ -202,7 +240,10 @@ class DepositService {
     // Extract order code from transfer content (OP = token deposit, OD = order payment)
     const orderCodeMatch = data.content.match(/(OP|OD)[A-Z0-9]+/);
     if (!orderCodeMatch) {
-      console.warn("[deposit] Webhook: no order code found in content:", data.content);
+      console.warn(
+        "[deposit] Webhook: no order code found in content:",
+        data.content,
+      );
       return { success: false };
     }
 
@@ -210,9 +251,13 @@ class DepositService {
 
     // Idempotency check: if this referenceCode was already processed, skip
     if (data.referenceCode) {
-      const existing = await depositsRepo.findByPaymentReference(data.referenceCode);
+      const existing = await depositsRepo.findByPaymentReference(
+        data.referenceCode,
+      );
       if (existing) {
-        console.log(`[deposit] Webhook: duplicate referenceCode ${data.referenceCode}, skipping`);
+        console.log(
+          `[deposit] Webhook: duplicate referenceCode ${data.referenceCode}, skipping`,
+        );
         return { success: true, orderId: existing.id };
       }
     }
@@ -231,7 +276,9 @@ class DepositService {
 
     // Only process pending or expired orders (late payment recovery)
     if (order.status !== "pending" && order.status !== "expired") {
-      console.warn(`[deposit] Webhook: order ${order.id} has status ${order.status}, cannot process`);
+      console.warn(
+        `[deposit] Webhook: order ${order.id} has status ${order.status}, cannot process`,
+      );
       return { success: false };
     }
 
@@ -253,7 +300,12 @@ class DepositService {
              payment_reference = $3,
              paid_at = $4
          WHERE id = $1`,
-        [order.id, "bank_transfer", data.referenceCode, new Date(data.transactionDate)],
+        [
+          order.id,
+          "bank_transfer",
+          data.referenceCode,
+          new Date(data.transactionDate),
+        ],
       );
 
       // Credit tokens to user
@@ -303,7 +355,12 @@ class DepositService {
     if (!user) throw Errors.notFound("User");
 
     if (amount > 0) {
-      await tokenService.credit(targetUserId, amount, `Admin: ${reason}`, `admin:${adminUserId}`);
+      await tokenService.credit(
+        targetUserId,
+        amount,
+        `Admin: ${reason}`,
+        `admin:${adminUserId}`,
+      );
     } else if (amount < 0) {
       await tokenService.debit(
         targetUserId,
@@ -326,7 +383,8 @@ class DepositService {
     const isExpired = expiresAt <= now;
 
     // Auto-update status if expired
-    const status = order.status === "pending" && isExpired ? "expired" : order.status;
+    const status =
+      order.status === "pending" && isExpired ? "expired" : order.status;
 
     return {
       id: order.id,
@@ -371,7 +429,10 @@ class DepositService {
     status?: string,
     userId?: string,
   ): Promise<{
-    deposits: (DepositOrderResponse & { user_email: string; user_name: string })[];
+    deposits: (DepositOrderResponse & {
+      user_email: string;
+      user_name: string;
+    })[];
     total: number;
     page: number;
     limit: number;
@@ -397,10 +458,46 @@ class DepositService {
     };
   }
 
+  // ── Pricing ────────────────────────────────────────────────────────────
+
+  /** Default packages used when no custom pricing is stored in settings */
+  private static DEFAULT_PACKAGES = [
+    {
+      id: "starter",
+      name: "Starter",
+      tokens: 100000,
+      bonus: 0,
+      popular: false,
+    },
+    { id: "basic", name: "Basic", tokens: 500000, bonus: 0, popular: false },
+    {
+      id: "standard",
+      name: "Standard",
+      tokens: 1000000,
+      bonus: 50000,
+      popular: true,
+    },
+    { id: "pro", name: "Pro", tokens: 2000000, bonus: 150000, popular: false },
+    {
+      id: "business",
+      name: "Business",
+      tokens: 5000000,
+      bonus: 500000,
+      popular: false,
+    },
+    {
+      id: "enterprise",
+      name: "Enterprise",
+      tokens: 10000000,
+      bonus: 1500000,
+      popular: false,
+    },
+  ];
+
   /**
-   * Get pricing info with packages
+   * Get pricing info with packages (reads from settings, falls back to defaults)
    */
-  getPricingInfo(): {
+  async getPricingInfo(): Promise<{
     pricePerMillion: number;
     currency: string;
     minimumTokens: number;
@@ -413,15 +510,18 @@ class DepositService {
       bonus: number;
       popular: boolean;
     }>;
-  } {
-    const packages = [
-      { id: "starter", name: "Starter", tokens: 100000, bonus: 0, popular: false },
-      { id: "basic", name: "Basic", tokens: 500000, bonus: 0, popular: false },
-      { id: "standard", name: "Standard", tokens: 1000000, bonus: 50000, popular: true },
-      { id: "pro", name: "Pro", tokens: 2000000, bonus: 150000, popular: false },
-      { id: "business", name: "Business", tokens: 5000000, bonus: 500000, popular: false },
-      { id: "enterprise", name: "Enterprise", tokens: 10000000, bonus: 1500000, popular: false },
-    ];
+  }> {
+    // Try to load custom pricing from settings
+    const stored = await settingsRepo.getSetting("deposit_pricing");
+    let packages = DepositService.DEFAULT_PACKAGES;
+
+    if (stored) {
+      try {
+        packages = JSON.parse(stored);
+      } catch {
+        // Fall back to defaults on invalid JSON
+      }
+    }
 
     return {
       pricePerMillion: depositsRepo.TOKEN_PRICE_VND,
@@ -433,6 +533,38 @@ class DepositService {
         priceVnd: depositsRepo.calculateVndFromTokens(pkg.tokens),
       })),
     };
+  }
+
+  /**
+   * Admin: Update deposit pricing packages
+   */
+  async updatePricing(
+    packages: Array<{
+      id: string;
+      name: string;
+      tokens: number;
+      bonus: number;
+      popular: boolean;
+    }>,
+  ) {
+    // Validate packages
+    for (const pkg of packages) {
+      if (!pkg.id || !pkg.name)
+        throw Errors.badRequest("Each package must have id and name");
+      if (pkg.tokens <= 0)
+        throw Errors.badRequest(`Package '${pkg.id}': tokens must be > 0`);
+      if (pkg.bonus < 0)
+        throw Errors.badRequest(`Package '${pkg.id}': bonus must be >= 0`);
+    }
+
+    // Check for duplicate IDs
+    const ids = packages.map((p) => p.id);
+    if (new Set(ids).size !== ids.length) {
+      throw Errors.badRequest("Package IDs must be unique");
+    }
+
+    await settingsRepo.setSetting("deposit_pricing", JSON.stringify(packages));
+    return this.getPricingInfo();
   }
 }
 

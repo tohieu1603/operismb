@@ -174,6 +174,65 @@ export async function updateOrderDepositId(
   );
 }
 
+/**
+ * List all orders (admin) with user info via JOIN
+ */
+export async function listAllOrders(
+  options: {
+    limit?: number;
+    offset?: number;
+    status?: OrderStatus;
+    userId?: string;
+    search?: string;
+  } = {},
+): Promise<{ orders: (Order & { user_email: string; user_name: string; items: OrderItem[] })[]; total: number }> {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  if (options.status) {
+    conditions.push(`o.status = $${idx++}`);
+    params.push(options.status);
+  }
+  if (options.userId) {
+    conditions.push(`o.user_id = $${idx++}`);
+    params.push(options.userId);
+  }
+  if (options.search) {
+    conditions.push(`(o.order_code ILIKE $${idx} OR u.email ILIKE $${idx})`);
+    params.push(`%${options.search}%`);
+    idx++;
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const limit = options.limit ?? 10;
+  const offset = options.offset ?? 0;
+
+  const countResult = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) as count FROM orders o LEFT JOIN users u ON o.user_id = u.id ${where}`,
+    params,
+  );
+
+  const rows = await queryAll<Order & { user_email: string; user_name: string }>(
+    `SELECT o.*, u.email as user_email, u.name as user_name
+     FROM orders o
+     LEFT JOIN users u ON o.user_id = u.id
+     ${where}
+     ORDER BY o.created_at DESC
+     LIMIT $${idx++} OFFSET $${idx++}`,
+    [...params, limit, offset],
+  );
+
+  // Fetch items for each order
+  const orders = [];
+  for (const row of rows) {
+    const items = await getOrderItems(row.id);
+    orders.push({ ...row, items });
+  }
+
+  return { orders, total: parseInt(countResult?.count ?? "0", 10) };
+}
+
 // ── Export ───────────────────────────────────────────────────────────────
 
 export const ordersRepo = {
@@ -186,6 +245,7 @@ export const ordersRepo = {
   getUserOrders,
   updateOrderStatus,
   updateOrderDepositId,
+  listAllOrders,
 };
 
 export default ordersRepo;
