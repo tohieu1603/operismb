@@ -13,8 +13,9 @@ import {
   adminCreateProduct,
   adminUpdateProduct,
   adminDeleteProduct,
-} from "../controllers/product.controller.js";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware.js";
+} from "../controllers/product.controller";
+import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { asyncHandler } from "../middleware/error.middleware";
 
 export const productRoutes = Router();
 
@@ -58,7 +59,7 @@ export const productRoutes = Router();
  *         description: Danh sách sản phẩm
  *     security: []
  */
-productRoutes.get("/", listProducts);
+productRoutes.get("/", asyncHandler(listProducts));
 
 /**
  * @swagger
@@ -71,7 +72,7 @@ productRoutes.get("/", listProducts);
  *         description: Mảng string các danh mục
  *     security: []
  */
-productRoutes.get("/categories", getCategories);
+productRoutes.get("/categories", asyncHandler(getCategories));
 
 /**
  * @swagger
@@ -91,7 +92,7 @@ productRoutes.get("/categories", getCategories);
  *         description: Không tìm thấy
  *     security: []
  */
-productRoutes.get("/:slug", getProductDetail);
+productRoutes.get("/:slug", asyncHandler(getProductDetail));
 
 /**
  * @swagger
@@ -112,7 +113,7 @@ productRoutes.get("/:slug", getProductDetail);
  *         description: Danh sách sản phẩm cùng danh mục
  *     security: []
  */
-productRoutes.get("/:slug/related", getRelatedProducts);
+productRoutes.get("/:slug/related", asyncHandler(getRelatedProducts));
 
 // =============================================================================
 // ADMIN ENDPOINTS
@@ -153,7 +154,7 @@ productRoutes.get("/:slug/related", getRelatedProducts);
  *       409:
  *         description: Slug đã tồn tại
  */
-productRoutes.post("/admin", authMiddleware, adminMiddleware, adminCreateProduct);
+productRoutes.post("/admin", authMiddleware, adminMiddleware, asyncHandler(adminCreateProduct));
 
 /**
  * @swagger
@@ -193,7 +194,7 @@ productRoutes.post("/admin", authMiddleware, adminMiddleware, adminCreateProduct
  *       404:
  *         description: Không tìm thấy
  */
-productRoutes.patch("/admin/:id", authMiddleware, adminMiddleware, adminUpdateProduct);
+productRoutes.patch("/admin/:id", authMiddleware, adminMiddleware, asyncHandler(adminUpdateProduct));
 
 /**
  * @swagger
@@ -214,6 +215,6 @@ productRoutes.patch("/admin/:id", authMiddleware, adminMiddleware, adminUpdatePr
  *       404:
  *         description: Không tìm thấy
  */
-productRoutes.delete("/admin/:id", authMiddleware, adminMiddleware, adminDeleteProduct);
+productRoutes.delete("/admin/:id", authMiddleware, adminMiddleware, asyncHandler(adminDeleteProduct));
 
 export default productRoutes;

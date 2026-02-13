@@ -6,7 +6,8 @@
 
 import crypto from "node:crypto";
 import { Router, type Request, type Response } from "express";
-import { apiKeyService } from "../services/api-key.service.js";
+import { apiKeyService } from "../services/api-key.service";
+import { asyncHandler } from "../middleware/error.middleware";
 
 const router = Router();
 
@@ -171,7 +172,7 @@ async function authenticateApiKey(req: Request): Promise<string | null> {
  * POST /v1/messages
  * Anthropic-compatible messages endpoint
  */
-router.post("/messages", async (req: Request, res: Response) => {
+router.post("/messages", asyncHandler(async (req: Request, res: Response) => {
   console.log("[anthropic-compat] Request received, stream:", req.body?.stream);
 
   try {
@@ -456,6 +457,6 @@ router.post("/messages", async (req: Request, res: Response) => {
       },
     });
   }
-});
+}));
 
 export default router;

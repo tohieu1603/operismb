@@ -3,16 +3,16 @@
  * CRUD operations for cronjobs and cronjob_executions tables using TypeORM
  */
 
-import { AppDataSource } from "../data-source.js";
-import { CronjobEntity } from "../entities/cronjob.entity.js";
-import { CronjobExecutionEntity } from "../entities/cronjob-execution.entity.js";
+import { AppDataSource } from "../data-source";
+import { CronjobEntity } from "../entities/cronjob.entity";
+import { CronjobExecutionEntity } from "../entities/cronjob-execution.entity";
 import type {
   Cronjob,
   CronjobCreate,
   CronjobUpdate,
   CronjobExecution,
   CronjobExecutionCreate,
-} from "./types.js";
+} from "./types";
 
 function getCronjobRepo() {
   return AppDataSource.getRepository(CronjobEntity);

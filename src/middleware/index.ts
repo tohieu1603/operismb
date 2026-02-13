@@ -2,8 +2,9 @@
  * Middleware exports
  */
 
-export * from "./auth.middleware.js";
-export * from "./error.middleware.js";
-export * from "./validate.middleware.js";
-export * from "./allow-hosts.middleware.js";
-export * from "./sepay-webhook.middleware.js";
+export * from "./auth.middleware";
+export * from "./error.middleware";
+export * from "./validate.middleware";
+export * from "./allow-hosts.middleware";
+export * from "./sepay-webhook.middleware";
+export * from "./openclaw-webhook.middleware";

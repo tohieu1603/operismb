@@ -2,9 +2,9 @@
  * Question Service - Product Q&A
  */
 
-import { Errors } from "../core/errors/api-error.js";
-import { questionsRepo, productsRepo, usersRepo } from "../db/index.js";
-import type { QuestionWithAnswers } from "../db/models/questions.js";
+import { Errors } from "../core/errors/api-error";
+import { questionsRepo, productsRepo, usersRepo } from "../db/index";
+import type { QuestionWithAnswers } from "../db/models/questions";
 
 class QuestionService {
   async getProductQuestions(

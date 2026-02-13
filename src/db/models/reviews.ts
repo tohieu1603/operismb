@@ -3,7 +3,7 @@
  * CRUD for reviews table
  */
 
-import { query, queryOne, queryAll } from "../connection.js";
+import { query, queryOne, queryAll } from "../connection";
 
 // ── Types ───────────────────────────────────────────────────────────────
 

@@ -5,16 +5,16 @@
  */
 
 import { CronExpressionParser } from "cron-parser";
-import cronjobsRepo from "../db/models/cronjobs.js";
-import { usersRepo } from "../db/index.js";
-import { Errors } from "../core/errors/api-error.js";
-import { analyticsService } from "./analytics.service.js";
+import cronjobsRepo from "../db/models/cronjobs";
+import { usersRepo } from "../db/index";
+import { Errors } from "../core/errors/api-error";
+import { analyticsService } from "./analytics.service";
 import type {
   Cronjob,
   CronjobCreate,
   CronjobUpdate,
   CronjobExecution,
-} from "../db/models/types.js";
+} from "../db/models/types";
 
 // Config
 const SCHEDULER_INTERVAL_MS = 60_000; // Check every minute

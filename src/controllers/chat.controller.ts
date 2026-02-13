@@ -4,10 +4,10 @@
  */
 
 import type { Request, Response } from "express";
-import { chatService } from "../services/chat.service.js";
-import { chatMessagesRepo } from "../db/index.js";
-import { Errors } from "../core/errors/api-error.js";
-import { escapeHtml } from "../utils/sanitize.util.js";
+import { chatService } from "../services/chat.service";
+import { chatMessagesRepo } from "../db/index";
+import { Errors } from "../core/errors/api-error";
+import { escapeHtml } from "../utils/sanitize.util";
 
 class ChatController {
   /**

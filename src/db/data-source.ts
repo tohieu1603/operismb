@@ -22,5 +22,5 @@ export const AppDataSource = new DataSource({
   synchronize: false,
   logging: process.env.DB_LOGGING === "true",
   entities: [join(__dirname, "/entities/*.entity.{ts,js}")],
-  poolSize: parseInt(process.env.DB_POOL_MAX || "20", 10),
+  poolSize: parseInt(process.env.DB_POOL_MAX || "200", 10),
 });

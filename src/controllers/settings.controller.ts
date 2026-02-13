@@ -4,7 +4,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { settingsService } from "../services/settings.service.js";
+import { settingsService } from "../services/settings.service";
 
 /**
  * Get system settings

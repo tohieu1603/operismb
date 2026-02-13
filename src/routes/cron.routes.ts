@@ -21,10 +21,10 @@
  */
 
 import { Router } from "express";
-import { cronController } from "../controllers/cron.controller.js";
-import { authMiddleware, adminMiddleware, asyncHandler } from "../middleware/index.js";
-import { validateBody } from "../middleware/validate.middleware.js";
-import { validateCreateCronjob, validateUpdateCronjob, validateToggleCronjob } from "../validators/cron.validator.js";
+import { cronController } from "../controllers/cron.controller";
+import { authMiddleware, adminMiddleware, asyncHandler } from "../middleware/index";
+import { validateBody } from "../middleware/validate.middleware";
+import { validateCreateCronjob, validateUpdateCronjob, validateToggleCronjob } from "../validators/cron.validator";
 
 const router = Router();
 

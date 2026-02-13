@@ -38,7 +38,7 @@ function resolveConfig(): DatabaseConfig {
     // Ensure password is always a string
     password: String(process.env.DB_PASSWORD || "080103"),
     ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-    poolSize: parseInt(process.env.DB_POOL_MAX || "20", 10),
+    poolSize: parseInt(process.env.DB_POOL_MAX || "200", 10),
   };
 }
 

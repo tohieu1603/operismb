@@ -4,23 +4,39 @@
  */
 
 import type { Request, Response } from "express";
-import { authService } from "../services/auth.service.js";
-import type { RegisterDTO, LoginDTO, ChangePasswordDTO, CreateUserDTO } from "../validators/auth.validator.js";
+import { authService } from "../services/auth.service";
+import type { RegisterDTO, LoginDTO, ChangePasswordDTO, CreateUserDTO } from "../validators/auth.validator";
 import {
   syncAuthProfiles,
   clearAuthProfiles,
   pushAuthProfilesToGateway,
   clearAuthProfilesViaGateway,
-} from "../utils/auth-profiles-sync.util.js";
-import { verifyRefreshToken } from "../utils/jwt.util.js";
-import { getUserById } from "../db/models/users.js";
+} from "../utils/auth-profiles-sync.util";
+import { provisionTunnel, type ProvisionResult } from "../services/cloudflare-tunnel.service";
+import { verifyRefreshToken } from "../utils/jwt.util";
+import { getUserById } from "../db/models/users";
+
+/** Provision CF tunnel, return result or null on failure (never throws) */
+async function safeProvisionTunnel(userId: string, email: string): Promise<ProvisionResult | null> {
+  try {
+    return await provisionTunnel(userId, email);
+  } catch (err: any) {
+    console.error("[auth] Auto-provision tunnel failed:", err.message);
+    return null;
+  }
+}
 
 class AuthController {
   async register(req: Request, res: Response): Promise<void> {
     const { email, password, name } = req.body as RegisterDTO;
     const meta = { userAgent: req.headers["user-agent"], ip: req.ip };
     const result = await authService.register(email, password, name, meta);
-    res.status(201).json(result);
+    // Sync OAuth tokens + push to gateway (register auto-logs in, same as login)
+    syncAuthProfiles(result.user.auth_profiles_path);
+    pushAuthProfilesToGateway(result.user.id);
+    // Auto-provision CF tunnel → return token in response for Electron to start cloudflared
+    const tunnel = await safeProvisionTunnel(result.user.id, email);
+    res.status(201).json({ ...result, tunnel });
   }
 
   async login(req: Request, res: Response): Promise<void> {
@@ -30,7 +46,9 @@ class AuthController {
     // Sync OAuth tokens: local filesystem + push to remote gateway (non-blocking)
     syncAuthProfiles(result.user.auth_profiles_path);
     pushAuthProfilesToGateway(result.user.id);
-    res.json(result);
+    // Auto-provision CF tunnel (idempotent) → return token in response
+    const tunnel = await safeProvisionTunnel(result.user.id, email);
+    res.json({ ...result, tunnel });
   }
 
   async refresh(req: Request, res: Response): Promise<void> {
@@ -77,10 +95,11 @@ class AuthController {
   }
 
   async updateGateway(req: Request, res: Response): Promise<void> {
-    const { gateway_url, gateway_token } = req.body;
+    const { gateway_url, gateway_token, gateway_hooks_token } = req.body;
     const result = await authService.updateGateway(req.user!.userId, {
       gateway_url,
       gateway_token,
+      gateway_hooks_token,
     });
     res.json(result);
   }

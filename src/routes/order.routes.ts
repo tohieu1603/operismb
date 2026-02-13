@@ -13,7 +13,11 @@ import {
   adminGetAllOrders,
   adminUpdateOrderStatus,
 } from "../controllers/order.controller.js";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware.js";
+import {
+  authMiddleware,
+  adminMiddleware,
+} from "../middleware/auth.middleware.js";
+import { asyncHandler } from "../middleware/error.middleware";
 
 export const orderRoutes = Router();
 
@@ -64,7 +68,7 @@ orderRoutes.use(authMiddleware);
  *       400:
  *         description: Hết hàng / giỏ trống
  */
-orderRoutes.post("/", checkout);
+orderRoutes.post("/", asyncHandler(checkout));
 
 /**
  * @swagger
@@ -88,7 +92,7 @@ orderRoutes.post("/", checkout);
  *       200:
  *         description: Danh sách đơn hàng + items
  */
-orderRoutes.get("/", getUserOrders);
+orderRoutes.get("/", asyncHandler(getUserOrders));
 
 // =============================================================================
 // ADMIN ENDPOINTS — must be registered before /:id to avoid route collision
@@ -189,7 +193,7 @@ orderRoutes.patch("/admin/:id", adminMiddleware, adminUpdateOrderStatus);
  *       404:
  *         description: Không tìm thấy
  */
-orderRoutes.get("/:id", getOrderDetail);
+orderRoutes.get("/:id", asyncHandler(getOrderDetail));
 
 /**
  * @swagger
@@ -211,6 +215,6 @@ orderRoutes.get("/:id", getOrderDetail);
  *       400:
  *         description: Không thể hủy (đơn không ở trạng thái pending)
  */
-orderRoutes.delete("/:id", cancelOrder);
+orderRoutes.delete("/:id", asyncHandler(cancelOrder));
 
 export default orderRoutes;

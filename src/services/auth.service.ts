@@ -2,17 +2,17 @@
  * Auth Service - Authentication business logic with refresh token rotation
  */
 
-import { usersRepo, refreshTokensRepo } from "../db/index.js";
-import { Errors } from "../core/errors/api-error.js";
-import { sanitizeUser } from "../utils/sanitize.util.js";
-import { hashPassword, verifyPassword } from "../utils/password.util.js";
+import { usersRepo, refreshTokensRepo } from "../db/index";
+import { Errors } from "../core/errors/api-error";
+import { sanitizeUser } from "../utils/sanitize.util";
+import { hashPassword, verifyPassword } from "../utils/password.util";
 import {
   generateTokens,
   verifyRefreshToken,
   hashToken,
   getRefreshTokenExpiryDate,
-} from "../utils/jwt.util.js";
-import type { SafeUser } from "../core/types/entities.js";
+} from "../utils/jwt.util";
+import type { SafeUser } from "../core/types/entities";
 
 export interface AuthResult {
   user: SafeUser;
@@ -207,18 +207,20 @@ class AuthService {
     return sanitizeUser(user);
   }
 
-  /** Update gateway_url and gateway_token for the authenticated user */
+  /** Update gateway_url, gateway_token, and gateway_hooks_token for the authenticated user */
   async updateGateway(
     userId: string,
-    data: { gateway_url?: string | null; gateway_token?: string | null },
+    data: { gateway_url?: string | null; gateway_token?: string | null; gateway_hooks_token?: string | null },
   ): Promise<SafeUser> {
     const user = await usersRepo.getUserById(userId);
     if (!user) throw Errors.notFound("User");
 
-    const updated = await usersRepo.updateUser(userId, {
-      gateway_url: data.gateway_url,
-      gateway_token: data.gateway_token,
-    });
+    const updates: Record<string, string | null | undefined> = {};
+    if (data.gateway_url !== undefined) updates.gateway_url = data.gateway_url;
+    if (data.gateway_token !== undefined) updates.gateway_token = data.gateway_token;
+    if (data.gateway_hooks_token !== undefined) updates.gateway_hooks_token = data.gateway_hooks_token;
+
+    const updated = await usersRepo.updateUser(userId, updates);
     if (!updated) throw Errors.notFound("User");
 
     return sanitizeUser(updated);

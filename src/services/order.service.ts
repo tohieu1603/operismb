@@ -3,9 +3,9 @@
  * Integrates with deposit system for SePay payments
  */
 
-import { Errors } from "../core/errors/api-error.js";
-import { transaction, depositsRepo, ordersRepo, settingsRepo } from "../db/index.js";
-import type { OrderWithItems, OrderStatus } from "../db/models/orders.js";
+import { Errors } from "../core/errors/api-error";
+import { transaction, depositsRepo, ordersRepo, settingsRepo } from "../db/index";
+import type { OrderWithItems, OrderStatus } from "../db/models/orders";
 
 export interface CheckoutInput {
   items: { product_slug: string; quantity: number }[];

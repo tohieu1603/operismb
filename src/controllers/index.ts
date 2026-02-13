@@ -2,9 +2,9 @@
  * Controllers exports
  */
 
-export * from "./auth.controller.js";
-export * from "./user.controller.js";
-export * from "./token.controller.js";
-export * from "./api-key.controller.js";
-export * from "./chat.controller.js";
-export * from "./cron.controller.js";
+export * from "./auth.controller";
+export * from "./user.controller";
+export * from "./token.controller";
+export * from "./api-key.controller";
+export * from "./chat.controller";
+export * from "./cron.controller";

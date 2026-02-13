@@ -3,7 +3,7 @@
  * Manage system configuration including AI providers
  */
 
-import { settingsRepo } from "../db/models/settings.js";
+import { settingsRepo } from "../db/models/settings";
 
 export interface ProviderSettings {
   id: string;

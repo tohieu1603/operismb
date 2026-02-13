@@ -3,10 +3,10 @@
  * CRUD operations for boxes table (Mini-PC devices)
  */
 
-import { AppDataSource } from "../data-source.js";
-import { BoxEntity } from "../entities/box.entity.js";
-import { BoxApiKeyEntity } from "../entities/box-api-key.entity.js";
-import type { Box, BoxCreate, BoxUpdate, BoxApiKey, BoxApiKeyCreate, BoxStatus } from "./types.js";
+import { AppDataSource } from "../data-source";
+import { BoxEntity } from "../entities/box.entity";
+import { BoxApiKeyEntity } from "../entities/box-api-key.entity";
+import type { Box, BoxCreate, BoxUpdate, BoxApiKey, BoxApiKeyCreate, BoxStatus } from "./types";
 
 // ============================================================================
 // Repository Helpers

@@ -27,9 +27,10 @@ import {
   adminGetAllDeposits,
   adminUpdatePricing,
   sepayWebhook,
-} from "../controllers/deposit.controller.js";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware.js";
-import { sepayWebhookMiddleware } from "../middleware/sepay-webhook.middleware.js";
+} from "../controllers/deposit.controller";
+import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { sepayWebhookMiddleware } from "../middleware/sepay-webhook.middleware";
+import { asyncHandler } from "../middleware/error.middleware";
 
 export const depositRoutes = Router();
 
@@ -86,7 +87,7 @@ export const depositRoutes = Router();
  *
  *     security: []
  */
-depositRoutes.get("/pricing", getPricing);
+depositRoutes.get("/pricing", asyncHandler(getPricing));
 
 /**
  * @swagger
@@ -157,7 +158,7 @@ depositRoutes.get("/pricing", getPricing);
  *
  *     security: []
  */
-depositRoutes.post("/webhook/sepay", sepayWebhookMiddleware, sepayWebhook);
+depositRoutes.post("/webhook/sepay", sepayWebhookMiddleware, asyncHandler(sepayWebhook));
 
 // Protected endpoints (require auth)
 depositRoutes.use(authMiddleware);
@@ -267,7 +268,7 @@ depositRoutes.use(authMiddleware);
  *     security:
  *       - BearerAuth: []
  */
-depositRoutes.post("/", createDeposit);
+depositRoutes.post("/", asyncHandler(createDeposit));
 
 /**
  * @swagger
@@ -313,7 +314,7 @@ depositRoutes.post("/", createDeposit);
  *     security:
  *       - BearerAuth: []
  */
-depositRoutes.get("/pending", getPendingOrder);
+depositRoutes.get("/pending", asyncHandler(getPendingOrder));
 
 /**
  * @swagger
@@ -378,7 +379,7 @@ depositRoutes.get("/pending", getPendingOrder);
  *     security:
  *       - BearerAuth: []
  */
-depositRoutes.delete("/:id", cancelPendingOrder);
+depositRoutes.delete("/:id", asyncHandler(cancelPendingOrder));
 
 /**
  * @swagger
@@ -449,7 +450,7 @@ depositRoutes.delete("/:id", cancelPendingOrder);
  *     security:
  *       - BearerAuth: []
  */
-depositRoutes.get("/history", getDepositHistory);
+depositRoutes.get("/history", asyncHandler(getDepositHistory));
 
 /**
  * @swagger
@@ -504,7 +505,7 @@ depositRoutes.get("/history", getDepositHistory);
  *     security:
  *       - BearerAuth: []
  */
-depositRoutes.get("/tokens/history", getTokenHistory);
+depositRoutes.get("/tokens/history", asyncHandler(getTokenHistory));
 
 /**
  * @swagger
@@ -555,7 +556,7 @@ depositRoutes.get("/tokens/history", getTokenHistory);
  *     security:
  *       - BearerAuth: []
  */
-depositRoutes.get("/:id", getDeposit);
+depositRoutes.get("/:id", asyncHandler(getDeposit));
 
 // =============================================================================
 // ADMIN ENDPOINTS - Yêu cầu quyền Admin
@@ -662,7 +663,7 @@ depositRoutes.get("/:id", getDeposit);
  *     security:
  *       - BearerAuth: []
  */
-depositRoutes.get("/admin/all", adminMiddleware, adminGetAllDeposits);
+depositRoutes.get("/admin/all", adminMiddleware, asyncHandler(adminGetAllDeposits));
 
 /**
  * @swagger
@@ -766,7 +767,7 @@ depositRoutes.get("/admin/all", adminMiddleware, adminGetAllDeposits);
  *     security:
  *       - BearerAuth: []
  */
-depositRoutes.post("/admin/tokens", adminMiddleware, adminUpdateTokens);
+depositRoutes.post("/admin/tokens", adminMiddleware, asyncHandler(adminUpdateTokens));
 
 /**
  * @swagger

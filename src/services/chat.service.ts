@@ -6,11 +6,11 @@
  */
 
 import crypto from "node:crypto";
-import { Errors } from "../core/errors/api-error.js";
-import { tokenService } from "./token.service.js";
-import { analyticsService } from "./analytics.service.js";
-import { usersRepo, chatMessagesRepo } from "../db/index.js";
-import { moltbotClientService } from "./moltbot-client.service.js";
+import { Errors } from "../core/errors/api-error";
+import { tokenService } from "./token.service";
+import { analyticsService } from "./analytics.service";
+import { usersRepo, chatMessagesRepo } from "../db/index";
+import { moltbotClientService } from "./moltbot-client.service";
 
 // Config
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";

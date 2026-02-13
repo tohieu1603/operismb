@@ -5,7 +5,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { CronjobEntity } from './cronjob.entity.js';
+import { CronjobEntity } from './cronjob.entity';
 
 @Entity('cronjob_executions')
 export class CronjobExecutionEntity {

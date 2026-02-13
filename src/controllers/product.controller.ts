@@ -3,8 +3,8 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { productService } from "../services/product.service.js";
-import type { ProductListOptions } from "../db/models/products.js";
+import { productService } from "../services/product.service";
+import type { ProductListOptions } from "../db/models/products";
 
 // ── Public ──────────────────────────────────────────────────────────────
 

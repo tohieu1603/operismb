@@ -2,7 +2,7 @@
  * User validators
  */
 
-import { Errors } from "../core/errors/api-error.js";
+import { Errors } from "../core/errors/api-error";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

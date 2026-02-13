@@ -18,3 +18,4 @@ export { CronjobExecutionEntity } from './cronjob-execution.entity';
 export { TokenTransactionEntity } from './token-transaction.entity';
 export { TokenUsageEntity } from './token-usage.entity';
 export { ChatMessageEntity } from './chat-message.entity';
+export { UserChannelEntity } from './user-channel.entity';

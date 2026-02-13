@@ -2,8 +2,8 @@
  * Cron validators (Moltbot-compatible)
  */
 
-import type { ValidationResult } from "./common.validator.js";
-import { escapeHtml } from "../utils/sanitize.util.js";
+import type { ValidationResult } from "./common.validator";
+import { escapeHtml } from "../utils/sanitize.util";
 
 // Cron schedule regex (basic validation - 5 or 6 fields)
 const CRON_REGEX = /^(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)(\s+(\*|[0-9,\-\/]+))?$/;

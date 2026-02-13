@@ -4,7 +4,7 @@
  */
 
 import type { Request, Response } from "express";
-import { tokenService } from "../services/token.service.js";
+import { tokenService } from "../services/token.service";
 
 class TokenController {
   async getBalance(req: Request, res: Response): Promise<void> {

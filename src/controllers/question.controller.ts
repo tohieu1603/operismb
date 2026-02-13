@@ -3,7 +3,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { questionService } from "../services/question.service.js";
+import { questionService } from "../services/question.service";
 
 export async function getProductQuestions(req: Request, res: Response, next: NextFunction) {
   try {

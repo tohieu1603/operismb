@@ -3,7 +3,7 @@
  * CRUD for questions + question_answers tables
  */
 
-import { queryOne, queryAll } from "../connection.js";
+import { queryOne, queryAll } from "../connection";
 
 // ── Types ───────────────────────────────────────────────────────────────
 

@@ -3,10 +3,10 @@
  */
 
 import crypto from "node:crypto";
-import { userApiKeysRepo, usersRepo } from "../db/index.js";
-import { Errors } from "../core/errors/api-error.js";
-import { sanitizeApiKey, sanitizeApiKeys } from "../utils/sanitize.util.js";
-import type { SafeApiKey } from "../core/types/entities.js";
+import { userApiKeysRepo, usersRepo } from "../db/index";
+import { Errors } from "../core/errors/api-error";
+import { sanitizeApiKey, sanitizeApiKeys } from "../utils/sanitize.util";
+import type { SafeApiKey } from "../core/types/entities";
 
 export interface ApiKeyWithUser extends SafeApiKey {
   user: { id: string; email: string; name: string } | null;

@@ -3,7 +3,7 @@
  * CRUD for products, product_tags, product_specs, product_full_specs
  */
 
-import { query, queryOne, queryAll, transaction } from "../connection.js";
+import { query, queryOne, queryAll, transaction } from "../connection";
 import type pg from "pg";
 
 // ── Types ───────────────────────────────────────────────────────────────

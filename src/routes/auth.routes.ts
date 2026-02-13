@@ -12,11 +12,11 @@
  */
 
 import { Router } from "express";
-import { authController } from "../controllers/auth.controller.js";
-import { authMiddleware, optionalAuthMiddleware, adminMiddleware, asyncHandler } from "../middleware/index.js";
-import { validateBody } from "../middleware/validate.middleware.js";
-import { validateRegister, validateLogin, validateRefresh, validateChangePassword, validateCreateUser } from "../validators/auth.validator.js";
-import { loginLimiter, registerLimiter, passwordChangeLimiter } from "../middleware/rate-limit.middleware.js";
+import { authController } from "../controllers/auth.controller";
+import { authMiddleware, optionalAuthMiddleware, adminMiddleware, asyncHandler } from "../middleware/index";
+import { validateBody } from "../middleware/validate.middleware";
+import { validateRegister, validateLogin, validateRefresh, validateChangePassword, validateCreateUser } from "../validators/auth.validator";
+import { loginLimiter, registerLimiter, passwordChangeLimiter } from "../middleware/rate-limit.middleware";
 
 const router = Router();
 
@@ -372,6 +372,18 @@ router.post(
   authMiddleware,
   validateBody(validateChangePassword),
   asyncHandler((req, res) => authController.changePassword(req, res)),
+);
+
+/**
+ * PATCH /auth/gateway
+ * Update gateway config (gateway_url, gateway_token, gateway_hooks_token)
+ * Requires: valid JWT
+ * Called by Electron client after tunnel provision to register local gateway tokens
+ */
+router.patch(
+  "/gateway",
+  authMiddleware,
+  asyncHandler((req, res) => authController.updateGateway(req, res)),
 );
 
 // =============================================================================
