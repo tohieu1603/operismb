@@ -36,7 +36,7 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
           res.status(400).json({ error: `Invalid tierId: ${tierId}`, code: "BAD_REQUEST" });
           return;
         }
-        tokenAmount = pkg.tokens + pkg.bonus;
+        tokenAmount = pkg.tokens;
       }
 
       if (!tokenAmount) {
