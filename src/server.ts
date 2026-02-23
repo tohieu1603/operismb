@@ -14,6 +14,8 @@ import { getPool, runMigrations } from "./db/connection";
 import { AppDataSource } from "./db/data-source";
 import openaiCompatRoutes from "./routes/openai-compat.routes";
 import anthropicCompatRoutes from "./routes/anthropic-compat.routes";
+import anthropicProxyRoutes from "./routes/anthropic-proxy.routes";
+import byteplusProxyRoutes from "./routes/byteplus-proxy.routes";
 import { cronService } from "./services/cron.service";
 import { swaggerSpec } from "./config/swagger.config";
 
@@ -65,8 +67,14 @@ async function main() {
     }),
   );
 
-  app.use(express.json({ limit: "10mb" }));
+  app.use(express.json({ limit: "50mb" }));
   app.use(allowHostsMiddleware);
+
+  // Debug: log all incoming requests
+  app.use((req, _res, next) => {
+    console.log(`[req] ${req.method} ${req.originalUrl} from=${req.ip}`);
+    next();
+  });
 
   // Health check at root
   app.get("/health", (_req, res) => {
@@ -84,6 +92,12 @@ async function main() {
 
   // Anthropic-compatible endpoint (drop-in replacement for api.anthropic.com)
   app.use("/v1", anthropicCompatRoutes);
+
+  // Anthropic OAuth proxy — forwards raw requests to api.anthropic.com using server-side token
+  app.use("/v1/anthropic", anthropicProxyRoutes);
+
+  // BytePlus proxy — forwards OpenAI-compatible requests to BytePlus Ark API using server-side key
+  app.use("/v1/byteplus", byteplusProxyRoutes);
 
   app.listen(PORT, HOST, () => {
     console.log(`[server] Operis API running at http://${HOST}:${PORT}`);

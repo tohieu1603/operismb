@@ -1,7 +1,8 @@
 #!/bin/bash
 # ============================================================
-# Model Benchmark Script
-# Tests 20 hard questions across all available models
+# OpenClaw Model Benchmark Script
+# Tests 20 tasks (10 categories × 2) based on OpenClaw system capabilities
+# Models: deepseek-chat, kimi-k2.5, kimi-k2-thinking, gpt-oss-120b, glm-4.7, seed-code
 # via OpenClaw gateway at localhost:3000
 # ============================================================
 
@@ -38,28 +39,77 @@ MODELS = [
     "byteplus/bytedance-seed-code",
 ]
 
-# 20 Hard Questions: (id, category, question, expected_keyword)
+# ============================================================
+# 20 Workflow Tasks — Basic → Intermediate → Advanced
+# Based on actual OpenClaw user workflows:
+#   Basic (1-6):       Simple chat, Q&A, Vietnamese, basic code
+#   Intermediate (7-14): Coding, summarize, content, data extraction
+#   Advanced (15-20):   Multi-step, tool calls, complex constraints
+# ============================================================
+
 QUESTIONS = [
-    (1, "Math", "What is 97 * 103? Explain using the difference of squares formula (a-b)(a+b) = a^2 - b^2.", "9991"),
-    (2, "Logic", "A farmer has 17 sheep. All but 9 die. How many sheep are left alive?", "9"),
-    (3, "Coding", "Write a Python function to find the longest palindromic substring using Manacher's algorithm. Full implementation with O(n) complexity.", "def"),
-    (4, "Science", "Explain why a mirror appears to reverse left and right but not up and down. Is this actually true? What does a mirror really reverse?", "front"),
-    (5, "Trick", "If you have a bowl with six apples and you take away four, how many do you have?", "4"),
-    (6, "System Design", "Design a rate limiter using the token bucket algorithm. Provide pseudocode that handles concurrent requests safely with thread locks.", "token"),
-    (7, "Probability", "In the Monty Hall problem, should you switch doors? Calculate the exact probability for switching vs staying.", "2/3"),
-    (8, "Lateral", "A man pushes his car to a hotel and tells the owner he is bankrupt. Why?", "monopoly"),
-    (9, "SQL", "Write a SQL query to find the second highest salary from an Employees table. Do NOT use LIMIT, TOP, or window functions. Use subquery only.", "SELECT"),
-    (10, "Vietnamese", "Giai thich su khac biet giua machine learning, deep learning va artificial intelligence. Cho vi du cu the cho moi loai.", "neural"),
-    (11, "Calculus", "Find the derivative of f(x) = x^x for x > 0. Show all steps using logarithmic differentiation.", "ln"),
-    (12, "Concurrency", "Explain the ABA problem in lock-free programming. Why is compare-and-swap (CAS) vulnerable to it? Provide a solution.", "tag"),
-    (13, "Philosophy", "Explain the Chinese Room argument by John Searle. Does it successfully refute strong AI? Give arguments for and against.", "understand"),
-    (14, "Security", "Explain how a timing side-channel attack works against string comparison for passwords. Write a constant-time comparison function.", "constant"),
-    (15, "Number Theory", "Prove that the square root of 2 is irrational using proof by contradiction. Show every step clearly.", "contradiction"),
-    (16, "Biology", "Explain how CRISPR-Cas9 works: how does it find specific DNA sequences? What is the guide RNA role? What are off-target effects?", "guide"),
-    (17, "Distributed", "Explain the Raft consensus algorithm. How does leader election work? What happens during a network partition? Compare briefly with Paxos.", "leader"),
-    (18, "Hard Logic", "You have 12 balls, one is heavier or lighter (unknown). You have a balance scale and can weigh 3 times. How do you find the odd ball and determine if heavier or lighter?", "weigh"),
-    (19, "Performance", "Given an array of 1 million integers, find the kth largest. Compare sorting O(n log n), min-heap O(n log k), and quickselect O(n). Which is best?", "quickselect"),
-    (20, "Creative", "Write a short story (max 150 words) with a hidden plot twist. The twist must be logically consistent with clues hidden in the story.", "twist"),
+    # ======== BASIC WORKFLOWS (1-6) ========
+    # WF1: Simple greeting & Q&A — user sends casual question via Telegram/Zalo
+    (1, "WF-Basic", "Xin chao! Toi la Minh. Ban co the gioi thieu ban than va cho toi biet hom nay la thu may khong?", "Minh"),
+
+    # WF2: Simple knowledge query — user asks factual question
+    (2, "WF-Basic", "What are the 3 main differences between REST and GraphQL APIs? Answer in a numbered list, keep each point under 25 words.", "GraphQL"),
+
+    # WF3: Basic Vietnamese conversation — natural VN chat
+    (3, "WF-Basic", "Giai thich cho toi hieu 'container' va 'virtual machine' khac nhau nhu the nao, dung vi du don gian nhu giai thich cho nguoi moi hoc lap trinh.", "container"),
+
+    # WF4: Simple code explanation — user asks to explain code snippet
+    (4, "WF-Basic", "Explain what this code does in simple terms:\n```javascript\nconst pipe = (...fns) => x => fns.reduce((v, f) => f(v), x);\n```\nGive one example of how to use it.", "reduce"),
+
+    # WF5: Quick translation — user sends message to translate for channel
+    (5, "WF-Basic", "Dich doan van sau sang tieng Anh chuyen nghiep:\n'Chung toi xin thong bao he thong se bao tri tu 22h ngay 15/02/2026 den 6h ngay 16/02/2026. Trong thoi gian nay, dich vu se tam ngung hoat dong. Xin loi vi su bat tien.'", "maintenance"),
+
+    # WF6: Simple formatting — user asks to format data
+    (6, "WF-Basic", "Format this data as a markdown table:\nName: Minh, Role: Backend Dev, Team: Platform\nName: Lan, Role: Frontend Dev, Team: Product\nName: Duc, Role: DevOps, Team: Infrastructure", "| Minh"),
+
+    # ======== INTERMEDIATE WORKFLOWS (7-14) ========
+    # WF7: Write a function — coding-agent workflow
+    (7, "WF-Mid", "Write a complete TypeScript function called `debounce<T>` that:\n- Takes a callback function and delay (ms)\n- Returns a debounced version\n- Preserves `this` context\n- Has proper generic typing\n- Include JSDoc comment\nOutput only the code.", "debounce"),
+
+    # WF8: Debug code — user pastes buggy code
+    (8, "WF-Mid", "This Python function is supposed to merge two sorted lists but has a bug. Find and fix it:\n```python\ndef merge_sorted(a, b):\n    result = []\n    i = j = 0\n    while i < len(a) and j < len(b):\n        if a[i] <= b[j]:\n            result.append(a[i])\n            i += 1\n        else:\n            result.append(b[j])\n            j += 1\n    return result\n```\nExplain the bug and provide the corrected code.", "remaining"),
+
+    # WF9: Summarize content — user sends long text for summary
+    (9, "WF-Mid", "Summarize this in exactly 3 bullet points (max 20 words each):\n\nKubernetes is an open-source container orchestration platform that automates deploying, scaling, and managing containerized applications. It groups containers into pods for easy management. It provides self-healing - restarts failed containers, replaces containers when nodes die, and kills unresponsive containers. It offers horizontal scaling manually or automatically based on CPU. Service discovery and load balancing are built-in via DNS or IP. It manages storage orchestration with automatic mounting.", "pod"),
+
+    # WF10: Write professional content — user asks bot to draft message for channel
+    (10, "WF-Mid", "Write a Telegram bot welcome message for an AI assistant called 'OpenClaw'. Requirements:\n- Greet the user warmly\n- Explain 3 key features: coding help, task automation, multi-language support\n- Use emoji appropriately\n- End with a call-to-action\n- Max 120 words\n- Tone: friendly but professional", "OpenClaw"),
+
+    # WF11: Data extraction — user sends raw text, wants structured JSON
+    (11, "WF-Mid", "Extract structured data from this text as JSON with fields {name, role, company, action, deadline}:\n\n'Hi team, this is Nguyen Van A from VNG Corporation. As the lead DevOps engineer, I need everyone to complete the CI/CD pipeline migration to GitHub Actions by March 15th, 2026.'", "Nguyen"),
+
+    # WF12: Vietnamese technical explanation — explain tech concept in VN
+    (12, "WF-Mid", "Giai thich khai niem 'Infrastructure as Code' bang tieng Viet cho developer moi. Bao gom:\n1. Dinh nghia don gian\n2. Tai sao can dung\n3. Vi du cu the voi Docker Compose\n4. So sanh truoc/sau khi dung IaC\nGiu ngan gon, toi da 200 tu.", "Docker"),
+
+    # WF13: API error analysis — user sends error, asks for fix
+    (13, "WF-Mid", "Analyze this API error and suggest 3 specific fixes:\n```json\n{\"status\": 429, \"error\": \"Too Many Requests\", \"headers\": {\"retry-after\": \"30\", \"x-ratelimit-limit\": \"100\", \"x-ratelimit-remaining\": \"0\"}, \"body\": {\"message\": \"Rate limit exceeded. Implement exponential backoff.\"}}\n```", "backoff"),
+
+    # WF14: Log parsing — user asks bot to parse and analyze logs
+    (14, "WF-Mid", "Parse this nginx log and extract as JSON {ip, method, path, status, response_time_ms}:\n```\n103.216.82.15 - - [12/Feb/2026:14:23:45 +0700] \"POST /v1/chat/completions HTTP/1.1\" 200 4523 \"-\" \"Mozilla/5.0\" 0.847\n```\nAlso: is this request healthy? Why or why not?", "103.216"),
+
+    # ======== ADVANCED WORKFLOWS (15-20) ========
+    # WF15: Multi-step deployment plan — complex reasoning
+    (15, "WF-Adv", "Design a zero-downtime deployment plan for a Node.js app with PostgreSQL and Redis dependencies. Requirements:\n- Blue-green deployment\n- Database migration safety\n- Rollback strategy\n- Health check verification\nProvide exactly 7 ordered steps. Each step must include: action, risk, and rollback plan.", "migration"),
+
+    # WF16: Tool call generation — model must generate structured tool calls
+    (16, "WF-Adv", "You are an AI assistant with these tools:\n- send_message(channel: string, text: string) — send to chat channel\n- web_fetch(url: string) — fetch URL content\n- set_reminder(time: string, message: string) — schedule reminder\n- exec_command(command: string) — run shell command\n\nUser request: 'Check if our API at https://api.example.com/health is up. If it responds, send a summary to #monitoring channel. Also remind me in 1 hour to check again.'\n\nGenerate the tool calls as a JSON array with proper parameters. Output ONLY valid JSON.", "send_message"),
+
+    # WF17: Complex cron + math — automation workflow
+    (17, "WF-Adv", "I have 3 cron jobs:\n- Job A: runs every 15 minutes (*/15 * * * *)\n- Job B: runs at minute 0 every hour (0 * * * *)\n- Job C: runs at 00:00 daily (0 0 * * *)\n\nCalculate:\n(a) Total executions in 24 hours for each job\n(b) Total combined executions\n(c) At what times do Job A and Job B execute simultaneously?\n(d) Write a single cron expression that would run at the same times as Job A but skip the times when Job B runs.\nShow all work.", "96"),
+
+    # WF18: Full feature implementation — coding-agent advanced workflow
+    (18, "WF-Adv", "Implement a complete TypeScript rate limiter class using the token bucket algorithm:\n- Constructor takes: maxTokens, refillRate (tokens/sec), refillInterval (ms)\n- Method `tryConsume(tokens: number): boolean` — returns true if allowed\n- Method `getStatus(): {available: number, max: number, nextRefill: number}`\n- Must be thread-safe for concurrent calls\n- Include full type definitions\n- Include usage example\nOutput production-ready code only.", "tryConsume"),
+
+    # WF19: Multi-constraint formatting — strict instruction following
+    (19, "WF-Adv", "Follow ALL rules EXACTLY:\n1. Start response with 'REPORT:'\n2. Write a 3-row markdown table with columns: Model, Speed, Quality, Cost\n3. Row 1: GPT-4o, Fast, High, $$$\n4. Row 2: Claude, Medium, Very High, $$\n5. Row 3: DeepSeek, Fast, Good, $\n6. After the table, write exactly one sentence summary\n7. End with 'END_REPORT'\n8. Do NOT include any other text before REPORT: or after END_REPORT", "REPORT:"),
+
+    # WF20: Vietnamese complex task — advanced VN workflow
+    (20, "WF-Adv", "Viet mot ban ke hoach ky thuat (technical plan) bang tieng Viet de chuyen doi he thong tu monolith sang microservices. Yeu cau:\n1. Chia thanh 5 giai doan cu the\n2. Moi giai doan co: muc tieu, cong viec chinh, rui ro, thoi gian uoc tinh\n3. Dinh dang bang markdown table\n4. Bao gom cac dich vu: Auth, Payment, Notification, Order\n5. Tong thoi gian khong qua 6 thang\nChi xuat markdown, khong giai thich them.", "microservice"),
 ]
 
 import urllib.request
@@ -176,7 +226,7 @@ for m in models:
 for rank, m in enumerate(sorted(models, key=lambda x: -model_stats[x]["score"]), 1):
     s = model_stats[m]
     short = m.split("/")[-1]
-    medal = ["🥇", "🥈", "🥉", "4.", "5."][rank - 1]
+    medal = ["🥇", "🥈", "🥉", "4.", "5.", "6."][rank - 1]
     lines.append(f"| {medal} | **{short}** | {s['ok']}/20 | {s['kw']}/20 | **{s['score']}%** | {s['avg_t']}s | {s['total_tok']:,} |")
 
 # Per-question detail matrix
