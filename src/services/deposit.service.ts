@@ -1,6 +1,6 @@
 /**
  * Deposit Service - Handle token deposits with SePay integration
- * Pricing: 1,000,000 tokens = 500,000 VND
+ * Package-based pricing (fixed packages, not per-token)
  */
 
 import { Errors } from "../core/errors/api-error";
@@ -460,55 +460,61 @@ class DepositService {
 
   // ── Pricing ────────────────────────────────────────────────────────────
 
-  /** Default packages used when no custom pricing is stored in settings */
+  /** Default packages used when no custom pricing is stored in settings.
+   *  tokens = -1 means unlimited. */
   private static DEFAULT_PACKAGES = [
     {
-      id: "starter",
-      name: "Starter",
-      tokens: 100000,
-      bonus: 0,
-      popular: false,
-    },
-    { id: "basic", name: "Basic", tokens: 500000, bonus: 0, popular: false },
-    {
-      id: "standard",
-      name: "Standard",
+      id: "thue-bao",
+      name: "Gói Thuê Bao",
       tokens: 1000000,
-      bonus: 50000,
+      priceVnd: 200000,
+      unlimited: false,
+      popular: false,
+      description: "1.000.000 Token — phù hợp sử dụng cá nhân nhẹ nhàng",
+    },
+    {
+      id: "thang-1",
+      name: "Gói Tháng 1",
+      tokens: 200000000,
+      priceVnd: 2500000,
+      unlimited: false,
       popular: true,
-    },
-    { id: "pro", name: "Pro", tokens: 2000000, bonus: 150000, popular: false },
-    {
-      id: "business",
-      name: "Business",
-      tokens: 5000000,
-      bonus: 500000,
-      popular: false,
+      description: "200.000.000 Token — đủ cho công việc cường độ cao",
     },
     {
-      id: "enterprise",
-      name: "Enterprise",
-      tokens: 10000000,
-      bonus: 1500000,
+      id: "thang-2-vip",
+      name: "Gói Tháng 2 (VIP)",
+      tokens: -1,
+      priceVnd: 6000000,
+      unlimited: true,
       popular: false,
+      description: "KHÔNG GIỚI HẠN Token — thoải mái sử dụng mọi tính năng",
+    },
+    {
+      id: "doanh-nghiep",
+      name: "Gói Doanh Nghiệp",
+      tokens: 0,
+      priceVnd: 0,
+      unlimited: false,
+      popular: false,
+      description: "Deal giá riêng theo quy mô — liên hệ để được tư vấn",
     },
   ];
 
   /**
    * Get pricing info with packages (reads from settings, falls back to defaults)
+   * tokens = -1 means unlimited
    */
   async getPricingInfo(): Promise<{
-    pricePerMillion: number;
     currency: string;
-    minimumTokens: number;
-    minimumVnd: number;
     packages: Array<{
       id: string;
       name: string;
       tokens: number;
       priceVnd: number;
-      bonus: number;
+      unlimited: boolean;
       popular: boolean;
+      description: string;
     }>;
   }> {
     // Try to load custom pricing from settings
@@ -524,14 +530,8 @@ class DepositService {
     }
 
     return {
-      pricePerMillion: depositsRepo.TOKEN_PRICE_VND,
       currency: "VND",
-      minimumTokens: 100000,
-      minimumVnd: depositsRepo.calculateVndFromTokens(100000),
-      packages: packages.map((pkg) => ({
-        ...pkg,
-        priceVnd: depositsRepo.calculateVndFromTokens(pkg.tokens),
-      })),
+      packages,
     };
   }
 
@@ -543,18 +543,18 @@ class DepositService {
       id: string;
       name: string;
       tokens: number;
-      bonus: number;
+      priceVnd: number;
+      unlimited: boolean;
       popular: boolean;
+      description: string;
     }>,
   ) {
     // Validate packages
     for (const pkg of packages) {
       if (!pkg.id || !pkg.name)
         throw Errors.badRequest("Each package must have id and name");
-      if (pkg.tokens <= 0)
-        throw Errors.badRequest(`Package '${pkg.id}': tokens must be > 0`);
-      if (pkg.bonus < 0)
-        throw Errors.badRequest(`Package '${pkg.id}': bonus must be >= 0`);
+      if (pkg.priceVnd < 0)
+        throw Errors.badRequest(`Package '${pkg.id}': priceVnd must be >= 0`);
     }
 
     // Check for duplicate IDs
