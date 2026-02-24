@@ -13,8 +13,8 @@ import { usersRepo, chatMessagesRepo } from "../db/index";
 
 // Config
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
-const STREAM_TIMEOUT_MS = 180_000; // Total stream timeout (covers fetch + reading)
-const CHUNK_TIMEOUT_MS = 60_000; // Max wait between chunks before aborting
+const STREAM_TIMEOUT_MS = 600_000; // Total stream timeout — 10min for long agent runs (tool calls)
+const CHUNK_TIMEOUT_MS = 300_000; // Max wait between chunks — 5min for tool execution (browser, code, etc.)
 const KEEPALIVE_INTERVAL_MS = 15_000; // SSE keepalive ping to prevent tunnel idle timeout
 const MAX_RETRIES = 2;
 const AUTH_ERROR_PATTERN = /authentication_error|invalid.*api.key|unauthorized|rate_limit|credit.*balance.*low|billing|FailoverError/i;
@@ -28,9 +28,15 @@ const PRICING: Record<string, { input: number; output: number }> = {
   "deepseek-chat": { input: 0.14, output: 0.28 },
 };
 
+interface ImageInput {
+  data: string;
+  mimeType: string;
+}
+
 interface StreamOptions {
   conversationId?: string;
   systemPrompt?: string;
+  images?: ImageInput[];
 }
 
 const MAX_HISTORY_MESSAGES = 20;
@@ -108,20 +114,29 @@ async function streamMessage(
   // Load conversation history
   const history = await loadConversationHistory(userId, convId);
 
-  // Save user message to history
-  await chatMessagesRepo.createMessage({
-    user_id: userId,
-    conversation_id: convId,
-    role: "user",
-    content: message,
-  });
+  // NOTE: User message is saved AFTER stream completes successfully (deferred save).
+  // This prevents orphaned user messages when user presses stop mid-stream.
 
   // Build messages: system prompt (if any) + history + new message
-  const messages: ChatMessage[] = [];
+  const messages: Array<{ role: string; content: string | unknown[] }> = [];
   if (options?.systemPrompt) {
     messages.push({ role: "system", content: options.systemPrompt });
   }
-  messages.push(...history, { role: "user", content: message });
+  messages.push(...history);
+
+  // Build user message — with image_url content parts if images provided
+  if (options?.images && options.images.length > 0) {
+    const contentParts: unknown[] = [{ type: "text", text: message }];
+    for (const img of options.images) {
+      contentParts.push({
+        type: "image_url",
+        image_url: { url: `data:${img.mimeType};base64,${img.data}` },
+      });
+    }
+    messages.push({ role: "user", content: contentParts });
+  } else {
+    messages.push({ role: "user", content: message });
+  }
 
   // Setup SSE headers (Cloudflare + Nginx compatible)
   res.setHeader("Content-Type", "text/event-stream");
@@ -291,6 +306,12 @@ async function streamMessage(
       }
     }
 
+    // Skip saving/billing if client disconnected (user pressed stop)
+    if (clientDisconnected) {
+      console.log(`[chat-stream] Client disconnected, skipping save for conv ${convId}`);
+      return;
+    }
+
     // Estimate tokens if not provided by gateway
     if (inputTokens === 0) inputTokens = estimateTokens(message);
     if (outputTokens === 0) outputTokens = estimateTokens(fullContent);
@@ -322,6 +343,14 @@ async function streamMessage(
         },
       });
     }
+
+    // Save user message (deferred — only on successful stream completion)
+    await chatMessagesRepo.createMessage({
+      user_id: userId,
+      conversation_id: convId,
+      role: "user",
+      content: message,
+    });
 
     // Save assistant response with usage data
     await chatMessagesRepo.createMessage({

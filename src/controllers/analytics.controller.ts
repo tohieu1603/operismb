@@ -5,6 +5,8 @@
 
 import type { Request, Response, NextFunction } from "express";
 import { analyticsService } from "../services/analytics.service";
+import { tokenService } from "../services/token.service";
+import type { RequestType } from "../db/models/types";
 
 // ============================================================================
 // User Analytics
@@ -132,6 +134,53 @@ export async function getUserHistory(req: Request, res: Response, next: NextFunc
       limit,
       offset,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Report token usage from client (chat or cronjob)
+ * POST /analytics/usage
+ */
+export async function reportUsage(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user!.userId;
+    const { request_type, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, model, metadata } =
+      req.body;
+
+    if (!request_type || !["chat", "cronjob", "api"].includes(request_type)) {
+      res.status(400).json({ error: "Invalid request_type. Must be chat, cronjob, or api." });
+      return;
+    }
+    if (input_tokens == null && output_tokens == null) {
+      res.status(400).json({ error: "input_tokens or output_tokens required." });
+      return;
+    }
+
+    const inputTokens = parseInt(input_tokens) || 0;
+    const outputTokens = parseInt(output_tokens) || 0;
+    const cacheRead = parseInt(cache_read_tokens) || 0;
+    const cacheWrite = parseInt(cache_write_tokens) || 0;
+    const totalTokens = inputTokens + outputTokens + cacheRead + cacheWrite;
+
+    if (totalTokens <= 0) {
+      res.json({ success: true, deducted: 0, balance: 0 });
+      return;
+    }
+
+    // Record analytics + deduct from balance
+    // prompt_tokens includes cache (matches Anthropic's prompt_tokens = input + cache_read + cache_write)
+    const result = await tokenService.deductUsage(userId, {
+      prompt_tokens: inputTokens + cacheRead + cacheWrite,
+      completion_tokens: outputTokens,
+      total_tokens: totalTokens,
+      model: model || undefined,
+      request_type: request_type as RequestType,
+      metadata: metadata || undefined,
+    });
+
+    res.json({ success: true, deducted: result.deducted, balance: result.balance });
   } catch (error) {
     next(error);
   }

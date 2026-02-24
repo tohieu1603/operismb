@@ -9,6 +9,7 @@ import {
   getUserDaily,
   getUserRange,
   getUserHistory,
+  reportUsage,
   getAdminOverview,
   getAdminDaily,
   getAdminRange,
@@ -78,6 +79,11 @@ analyticsRoutes.use(authMiddleware);
  *       - BearerAuth: []
  */
 analyticsRoutes.get("/usage", asyncHandler(getUserUsage));
+
+/**
+ * POST /analytics/usage - Report token usage from client (chat or cronjob)
+ */
+analyticsRoutes.post("/usage", asyncHandler(reportUsage));
 
 /**
  * @swagger

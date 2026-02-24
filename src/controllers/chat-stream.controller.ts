@@ -14,7 +14,7 @@ class ChatStreamController {
    * Note: SSE errors are handled within the service via sendSSE
    */
   async streamMessage(req: Request, res: Response): Promise<void> {
-    const { message, conversationId } = req.body;
+    const { message, conversationId, images } = req.body;
 
     if (!message || typeof message !== "string") {
       res.status(400).json({
@@ -24,9 +24,20 @@ class ChatStreamController {
       return;
     }
 
+    // Validate images array if provided: [{data: base64, mimeType: "image/png"}]
+    const validImages: Array<{ data: string; mimeType: string }> = [];
+    if (Array.isArray(images)) {
+      for (const img of images) {
+        if (img && typeof img.data === "string" && typeof img.mimeType === "string") {
+          validImages.push({ data: img.data, mimeType: img.mimeType });
+        }
+      }
+    }
+
     // Stream handles its own response via SSE
     await chatStreamService.streamMessage(req.user!.userId, escapeHtml(message), res, {
       conversationId,
+      images: validImages.length > 0 ? validImages : undefined,
     });
   }
 }
