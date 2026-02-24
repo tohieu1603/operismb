@@ -98,6 +98,7 @@ async function main() {
 
   // BytePlus proxy — forwards OpenAI-compatible requests to BytePlus Ark API using server-side key
   app.use("/v1/byteplus", byteplusProxyRoutes);
+  app.use("/api/v1/byteplus", byteplusProxyRoutes);
 
   app.listen(PORT, HOST, () => {
     console.log(`[server] Operis API running at http://${HOST}:${PORT}`);
