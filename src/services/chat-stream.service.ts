@@ -216,18 +216,30 @@ async function streamMessage(
         let isAuthError = false;
 
         try {
+          // Single abort-on-disconnect promise reused across all iterations (no leak)
+          const disconnectPromise = new Promise<never>((_, reject) => {
+            if (attemptController.signal.aborted) return reject(new Error("Client disconnected"));
+            attemptController.signal.addEventListener("abort", () => reject(new Error("Client disconnected")), { once: true });
+          });
+
           while (true) {
-            // Race: reader vs chunk timeout vs client disconnect (abort signal)
-            const chunkResult = await Promise.race([
-              reader.read(),
-              new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("Chunk timeout")), CHUNK_TIMEOUT_MS),
-              ),
-              new Promise<never>((_, reject) => {
-                if (attemptController.signal.aborted) return reject(new Error("Client disconnected"));
-                attemptController.signal.addEventListener("abort", () => reject(new Error("Client disconnected")), { once: true });
-              }),
-            ]);
+            // Race: reader vs chunk timeout vs client disconnect
+            // Clear timeout each iteration to prevent timer leak
+            let chunkTimer: ReturnType<typeof setTimeout> | undefined;
+            const chunkTimeoutPromise = new Promise<never>((_, reject) => {
+              chunkTimer = setTimeout(() => reject(new Error("Chunk timeout")), CHUNK_TIMEOUT_MS);
+            });
+
+            let chunkResult: ReadableStreamReadResult<Uint8Array>;
+            try {
+              chunkResult = await Promise.race([
+                reader.read(),
+                chunkTimeoutPromise,
+                disconnectPromise,
+              ]);
+            } finally {
+              clearTimeout(chunkTimer);
+            }
 
             const { done, value } = chunkResult;
             if (done) break;
