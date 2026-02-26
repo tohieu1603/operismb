@@ -53,6 +53,7 @@ async function syncCredentialsToGateway(
     return;
   }
   const token = user.gateway_hooks_token || user.gateway_token || "";
+  console.log(`[zalo] syncCreds: userId=${userId} email=${(user as any).email} url=${user.gateway_url} hooks_token=${user.gateway_hooks_token ?? "null"} gw_token=${user.gateway_token ? user.gateway_token.slice(0, 8) + "..." : "null"} using=${token.slice(0, 8)}...`);
   const url = `${user.gateway_url}/hooks/sync-credentials`;
   try {
     const res = await fetch(url, {
@@ -219,7 +220,7 @@ class ZaloService {
     try {
       const zalo = new Zalo({ logging: false });
 
-      let capturedCreds: { imei: string; cookie: unknown; userAgent: string } | null = null;
+      let capturedCreds: Record<string, unknown> | null = null;
 
       const api = await zalo.loginQR({}, (event: unknown) => {
         if (!event || typeof event !== "object") return;
@@ -235,15 +236,12 @@ class ZaloService {
           session.status = "qr_ready";
         }
 
-        // GotLoginInfo: capture credentials
+        // GotLoginInfo: capture ALL credential fields (imei, cookie, userAgent, zpw_enk, etc.)
         if (ev.data) {
           const d = ev.data as Record<string, unknown>;
           if (d.imei && d.cookie && d.userAgent) {
-            capturedCreds = {
-              imei: String(d.imei),
-              cookie: d.cookie,
-              userAgent: String(d.userAgent),
-            };
+            console.log(`[zalo] GotLoginInfo keys: ${Object.keys(d).join(", ")}`);
+            capturedCreds = { ...d };
             session.status = "scanned";
           }
         }
