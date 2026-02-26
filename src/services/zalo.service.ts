@@ -1,12 +1,9 @@
 /**
  * Zalo Service
  * Handles QR login flow via zca-js, manages sessions and credentials.
- * Syncs credentials to OpenClaw gateway path after login.
+ * Syncs credentials to gateway via HTTP hook (supports remote gateway).
  */
 
-import { writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { homedir } from "node:os";
 import { Zalo } from "zca-js";
 import {
   upsertUserChannel,
@@ -44,27 +41,51 @@ function cleanExpired() {
   }
 }
 
-/** Write credentials JSON to OpenClaw gateway path */
-async function syncCredentialsFile(
+/** Sync credentials to gateway via HTTP hook (works for both local and remote gateway) */
+async function syncCredentialsToGateway(
+  userId: string,
   credentials: Record<string, unknown>,
   accountLabel: string = "default",
 ): Promise<void> {
-  const dir = join(homedir(), ".openclaw", "credentials", "zalozcajs");
-  await mkdir(dir, { recursive: true });
-  const filePath = join(dir, `${accountLabel}.json`);
-  await writeFile(filePath, JSON.stringify(credentials, null, 2), "utf-8");
-  console.log(`[zalo] Credentials synced to ${filePath}`);
+  const user = await getUserById(userId);
+  if (!user?.gateway_url) {
+    console.warn("[zalo] No gateway_url configured, skipping credential sync");
+    return;
+  }
+  const token = user.gateway_hooks_token || user.gateway_token || "";
+  const url = `${user.gateway_url}/hooks/sync-credentials`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: "zalozcajs", accountId: accountLabel, action: "sync", credentials }),
+    });
+    if (!res.ok) console.warn(`[zalo] sync-credentials hook returned ${res.status}`);
+    else console.log(`[zalo] Credentials synced to gateway (${accountLabel})`);
+  } catch (err) {
+    console.warn(`[zalo] sync-credentials hook failed: ${err instanceof Error ? err.message : err}`);
+  }
 }
 
-/** Remove credentials file on disconnect */
-async function removeCredentialsFile(accountLabel: string = "default"): Promise<void> {
-  const { unlink } = await import("node:fs/promises");
-  const filePath = join(homedir(), ".openclaw", "credentials", "zalozcajs", `${accountLabel}.json`);
+/** Remove credentials from gateway via HTTP hook */
+async function removeCredentialsFromGateway(
+  userId: string,
+  accountLabel: string = "default",
+): Promise<void> {
+  const user = await getUserById(userId);
+  if (!user?.gateway_url) return;
+  const token = user.gateway_hooks_token || user.gateway_token || "";
+  const url = `${user.gateway_url}/hooks/sync-credentials`;
   try {
-    await unlink(filePath);
-    console.log(`[zalo] Credentials file removed: ${filePath}`);
-  } catch {
-    // file may not exist
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: "zalozcajs", accountId: accountLabel, action: "remove" }),
+    });
+    if (!res.ok) console.warn(`[zalo] remove-credentials hook returned ${res.status}`);
+    else console.log(`[zalo] Credentials removed from gateway (${accountLabel})`);
+  } catch (err) {
+    console.warn(`[zalo] remove-credentials hook failed: ${err instanceof Error ? err.message : err}`);
   }
 }
 
@@ -131,11 +152,11 @@ class ZaloService {
     }));
   }
 
-  /** Disconnect channel — removes credentials file too */
+  /** Disconnect channel — removes credentials from gateway too */
   async disconnect(userId: string, accountLabel: string = "default") {
     const result = await disconnectUserChannel(userId);
     if (result) {
-      await removeCredentialsFile(accountLabel);
+      await removeCredentialsFromGateway(userId, accountLabel);
     }
     return { disconnected: !!result };
   }
@@ -253,8 +274,8 @@ class ZaloService {
           is_connected: true,
         });
 
-        // Sync credentials file to OpenClaw gateway path
-        await syncCredentialsFile(capturedCreds as unknown as Record<string, unknown>);
+        // Sync credentials to gateway via HTTP hook
+        await syncCredentialsToGateway(session.userId, capturedCreds as unknown as Record<string, unknown>);
       }
 
       session.zaloUid = zaloUid;

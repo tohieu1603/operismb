@@ -28,7 +28,9 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
     let { tokenAmount } = req.body;
 
     if (type === "token") {
-      // Resolve tierId to tokenAmount if provided
+      let packagePriceVnd: number | undefined;
+
+      // Resolve tierId to tokenAmount + package price if provided
       if (!tokenAmount && tierId) {
         const pricing = await depositService.getPricingInfo();
         const pkg = pricing.packages.find((p) => p.id === tierId);
@@ -37,6 +39,7 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
           return;
         }
         tokenAmount = pkg.tokens;
+        packagePriceVnd = pkg.priceVnd; // Use package price, not per-token rate
       }
 
       if (!tokenAmount) {
@@ -44,7 +47,11 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
         return;
       }
 
-      const order = await depositService.createDeposit(userId, { type: "token", tokenAmount });
+      const order = await depositService.createDeposit(userId, {
+        type: "token",
+        tokenAmount,
+        amountVnd: packagePriceVnd, // Override calculated price with package price
+      });
       res.status(201).json(order);
     } else if (type === "order") {
       if (!amountVnd) {

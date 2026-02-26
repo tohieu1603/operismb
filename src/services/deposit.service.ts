@@ -72,7 +72,8 @@ class DepositService {
       if (input.tokenAmount < 100000)
         throw Errors.badRequest("Minimum deposit is 100,000 tokens");
       tokenAmount = input.tokenAmount;
-      amountVnd = depositsRepo.calculateVndFromTokens(tokenAmount);
+      // Use explicit amountVnd (from package price) if provided, else calculate from per-token rate
+      amountVnd = input.amountVnd ?? depositsRepo.calculateVndFromTokens(tokenAmount);
     } else {
       if (!input.amountVnd)
         throw Errors.badRequest("amountVnd is required for order payments");
@@ -82,7 +83,7 @@ class DepositService {
       amountVnd = input.amountVnd;
     }
 
-    // Check for existing pending order of same type (prevent spam)
+    // Check for existing pending order of same type
     const existingOrders = await depositsRepo.getUserDepositOrders(
       userId,
       10,
@@ -96,7 +97,12 @@ class DepositService {
     );
 
     if (pendingOrder) {
-      return this.formatDepositResponse(pendingOrder);
+      // Same amount → reuse existing order (prevent spam)
+      if (pendingOrder.amount_vnd === amountVnd) {
+        return this.formatDepositResponse(pendingOrder);
+      }
+      // Different amount → cancel old order, create new one below
+      await depositsRepo.updateDepositOrderStatus(pendingOrder.id, "cancelled");
     }
 
     // Mark old expired orders

@@ -12,7 +12,7 @@ import { analyticsService } from "./analytics.service";
 import { usersRepo, chatMessagesRepo } from "../db/index";
 
 // Config
-const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-6";
 const STREAM_TIMEOUT_MS = 600_000; // Total stream timeout — 10min for long agent runs (tool calls)
 const CHUNK_TIMEOUT_MS = 300_000; // Max wait between chunks — 5min for tool execution (browser, code, etc.)
 const KEEPALIVE_INTERVAL_MS = 15_000; // SSE keepalive ping to prevent tunnel idle timeout
@@ -153,6 +153,7 @@ async function streamMessage(
   }
 
   let fullContent = "";
+  let actualModel = ""; // Captured from gateway response chunks
   let inputTokens = 0;
   let outputTokens = 0;
   let totalTokens = 0;
@@ -256,6 +257,10 @@ async function streamMessage(
 
                 try {
                   const chunk = JSON.parse(data);
+                  // Capture actual model from gateway response (e.g. "byteplus/kimi-k2.5")
+                  if (!actualModel && chunk.model) {
+                    actualModel = chunk.model;
+                  }
                   const delta = chunk.choices?.[0]?.delta?.content;
 
                   if (delta) {
@@ -329,22 +334,25 @@ async function streamMessage(
     if (outputTokens === 0) outputTokens = estimateTokens(fullContent);
     if (totalTokens === 0) totalTokens = inputTokens + outputTokens;
 
+    // Use actual model from gateway response, fallback to DEFAULT_MODEL
+    const resolvedModel = actualModel || DEFAULT_MODEL;
+    const provider = resolvedModel.includes("/") ? resolvedModel.split("/")[0] : "anthropic";
+
     // Calculate cost
-    const pricing = PRICING[DEFAULT_MODEL] || PRICING["claude-sonnet-4-20250514"];
+    const pricing = PRICING[resolvedModel] || PRICING[DEFAULT_MODEL] || { input: 0, output: 0 };
     const inputCost = (inputTokens / 1_000_000) * pricing.input;
     const outputCost = (outputTokens / 1_000_000) * pricing.output;
     const totalCost = inputCost + outputCost;
 
-    // Deduct tokens
+    // Deduct tokens and record analytics (single source of truth — byteplus proxy skips for gateway requests)
     if (totalTokens > 0) {
       await tokenService.debit(userId, totalTokens, `Chat: ${message.slice(0, 30)}...`);
 
-      // Record usage for analytics
       await analyticsService.recordUsage({
         user_id: userId,
         request_type: "chat",
         request_id: convId,
-        model: DEFAULT_MODEL,
+        model: resolvedModel,
         input_tokens: inputTokens,
         output_tokens: outputTokens,
         total_tokens: totalTokens,
@@ -370,8 +378,8 @@ async function streamMessage(
       conversation_id: convId,
       role: "assistant",
       content: fullContent,
-      model: DEFAULT_MODEL,
-      provider: "anthropic",
+      model: resolvedModel,
+      provider,
       tokens_used: totalTokens,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
