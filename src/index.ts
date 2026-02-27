@@ -24,6 +24,7 @@ import {
   orderRoutes,
   reviewRoutes,
   questionRoutes,
+  cartRoutes,
 } from "./routes/index";
 import { errorMiddleware } from "./middleware/index";
 
@@ -51,6 +52,7 @@ operisRouter.use("/zalo", zaloRoutes);
 operisRouter.use("/tunnels", tunnelRoutes);
 operisRouter.use("/products", productRoutes);
 operisRouter.use("/orders", orderRoutes);
+operisRouter.use("/cart", cartRoutes);
 operisRouter.use("/", reviewRoutes);
 operisRouter.use("/", questionRoutes);
 

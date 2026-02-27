@@ -151,6 +151,11 @@ export const MSG = {
   INVALID_STATUS: (validStatuses: string) =>
     `Trạng thái không hợp lệ. Phải là: ${validStatuses}`,
 
+  // ── Validation: cart ────────────────────────────────────────────────────
+  CART_ITEMS_REQUIRED: "Danh sách sản phẩm là bắt buộc",
+  CART_INVALID_ITEM: "Mỗi item phải có product_slug (string) và quantity (số dương)",
+  CART_PRODUCT_NOT_FOUND: (slug: string) => `Sản phẩm '${slug}' không tồn tại`,
+
   // ── Validation: product ──────────────────────────────────────────────────
   INVALID_CATEGORY: (category: string, valid: string) =>
     `Danh mục '${category}' không hợp lệ. Phải là: ${valid}`,
