@@ -3,6 +3,7 @@
  */
 
 import { Errors } from "../core/errors/api-error";
+import { MSG } from "../constants/messages";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,7 +32,7 @@ export interface TopupDTO {
 export const UserValidator = {
   validateId(id: unknown): string {
     if (!id || typeof id !== "string" || !UUID_REGEX.test(id)) {
-      throw Errors.validation("Invalid user ID");
+      throw Errors.validation(MSG.INVALID_USER_ID);
     }
     return id;
   },
@@ -62,7 +63,7 @@ export const UserValidator = {
 
   validateUpdate(body: unknown): UpdateUserDTO {
     if (!body || typeof body !== "object") {
-      throw Errors.validation("Request body required");
+      throw Errors.validation(MSG.REQUEST_BODY_REQUIRED);
     }
 
     const data = body as Record<string, unknown>;
@@ -71,7 +72,7 @@ export const UserValidator = {
     // Name
     if (data.name !== undefined) {
       if (typeof data.name !== "string" || data.name.trim().length < 2) {
-        throw Errors.validation("Name must be at least 2 characters");
+        throw Errors.validation(MSG.NAME_MIN_LENGTH);
       }
       result.name = data.name.trim();
     }
@@ -79,7 +80,7 @@ export const UserValidator = {
     // Email
     if (data.email !== undefined) {
       if (typeof data.email !== "string" || !EMAIL_REGEX.test(data.email.trim())) {
-        throw Errors.validation("Invalid email format");
+        throw Errors.validation(MSG.EMAIL_INVALID);
       }
       result.email = data.email.trim().toLowerCase();
     }
@@ -87,7 +88,7 @@ export const UserValidator = {
     // Password
     if (data.password !== undefined) {
       if (typeof data.password !== "string" || data.password.length < 8) {
-        throw Errors.validation("Password must be at least 8 characters");
+        throw Errors.validation(MSG.PASSWORD_MIN_LENGTH);
       }
       result.password = data.password;
     }
@@ -95,7 +96,7 @@ export const UserValidator = {
     // Role
     if (data.role !== undefined) {
       if (!VALID_ROLES.includes(data.role as "admin" | "user")) {
-        throw Errors.validation("Invalid role");
+        throw Errors.validation(MSG.ROLE_INVALID);
       }
       result.role = data.role as "admin" | "user";
     }
@@ -103,7 +104,7 @@ export const UserValidator = {
     // Is active
     if (data.is_active !== undefined) {
       if (typeof data.is_active !== "boolean") {
-        throw Errors.validation("is_active must be boolean");
+        throw Errors.validation(MSG.IS_ACTIVE_INVALID);
       }
       result.is_active = data.is_active;
     }
@@ -111,13 +112,13 @@ export const UserValidator = {
     // Token balance
     if (data.token_balance !== undefined) {
       if (typeof data.token_balance !== "number" || data.token_balance < 0) {
-        throw Errors.validation("token_balance must be non-negative number");
+        throw Errors.validation(MSG.TOKEN_BALANCE_INVALID);
       }
       result.token_balance = data.token_balance;
     }
 
     if (Object.keys(result).length === 0) {
-      throw Errors.validation("No valid fields to update");
+      throw Errors.validation(MSG.NO_FIELDS_TO_UPDATE);
     }
 
     return result;
@@ -125,13 +126,13 @@ export const UserValidator = {
 
   validateTopup(body: unknown): TopupDTO {
     if (!body || typeof body !== "object") {
-      throw Errors.validation("Request body required");
+      throw Errors.validation(MSG.REQUEST_BODY_REQUIRED);
     }
 
     const { amount } = body as Record<string, unknown>;
 
     if (typeof amount !== "number" || amount <= 0 || !Number.isFinite(amount)) {
-      throw Errors.validation("Amount must be positive number");
+      throw Errors.validation(MSG.AMOUNT_MUST_BE_POSITIVE);
     }
 
     return { amount };

@@ -6,10 +6,11 @@
  */
 
 import type { Response } from "express";
-import { Errors } from "../core/errors/api-error";
+import { ApiError, ErrorCode, Errors } from "../core/errors/api-error";
 import { tokenService } from "./token.service";
 import { analyticsService } from "./analytics.service";
 import { usersRepo, chatMessagesRepo } from "../db/index";
+import { MSG } from "../constants/messages";
 
 // Config
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-6";
@@ -106,7 +107,7 @@ async function streamMessage(
   if (!user.is_active) throw Errors.accountDeactivated();
 
   if (!user.gateway_url || !user.gateway_token) {
-    throw Errors.serviceUnavailable("Gateway");
+    throw new ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG.GATEWAY_NOT_CONFIGURED);
   }
 
   const convId = options?.conversationId || generateConversationId();
@@ -206,7 +207,7 @@ async function streamMessage(
         }
 
         if (!response.body) {
-          throw new Error("No response body");
+          throw new Error(MSG.NO_RESPONSE_BODY);
         }
 
         // Read stream with per-chunk timeout to detect stalled connections

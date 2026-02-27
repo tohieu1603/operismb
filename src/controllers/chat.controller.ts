@@ -10,6 +10,7 @@ import { tokenService } from "../services/token.service";
 import { analyticsService } from "../services/analytics.service";
 import { Errors } from "../core/errors/api-error";
 import { escapeHtml } from "../utils/sanitize.util";
+import { MSG } from "../constants/messages";
 
 class ChatController {
   /**
@@ -19,7 +20,7 @@ class ChatController {
     const { message, conversationId } = req.body;
 
     if (!message || typeof message !== "string") {
-      throw Errors.validation("Message is required");
+      throw Errors.validation(MSG.MESSAGE_REQUIRED);
     }
 
     const result = await chatService.sendMessage(req.user!.userId, escapeHtml(message), { conversationId });
@@ -49,7 +50,7 @@ class ChatController {
     const conversationId = req.params.conversationId as string;
 
     if (!conversationId) {
-      throw Errors.validation("Conversation ID is required");
+      throw Errors.validation(MSG.CONVERSATION_ID_REQUIRED);
     }
 
     const userId = req.user!.userId;
@@ -75,7 +76,7 @@ class ChatController {
   async wsComplete(req: Request, res: Response): Promise<void> {
     const { conversationId, userMessage, assistantMessage, usage } = req.body;
     if (!conversationId || !userMessage || !assistantMessage) {
-      throw Errors.validation("conversationId, userMessage, assistantMessage required");
+      throw Errors.validation(MSG.SAVE_HISTORY_FIELDS_REQUIRED);
     }
 
     const userId = req.user!.userId;
@@ -129,7 +130,7 @@ class ChatController {
     const conversationId = req.params.conversationId as string;
 
     if (!conversationId) {
-      throw Errors.validation("Conversation ID is required");
+      throw Errors.validation(MSG.CONVERSATION_ID_REQUIRED);
     }
 
     await chatService.deleteConversation(req.user!.userId, conversationId);

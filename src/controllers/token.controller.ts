@@ -5,6 +5,7 @@
 
 import type { Request, Response } from "express";
 import { tokenService } from "../services/token.service";
+import { MSG } from "../constants/messages";
 
 class TokenController {
   async getBalance(req: Request, res: Response): Promise<void> {
@@ -51,11 +52,11 @@ class TokenController {
   async credit(req: Request, res: Response): Promise<void> {
     const { userId, amount, description } = req.body;
     if (!userId || typeof userId !== "string") {
-      res.status(400).json({ error: "userId is required and must be a string", code: "VALIDATION_ERROR" });
+      res.status(400).json({ error: MSG.USER_ID_REQUIRED, code: "VALIDATION_ERROR" });
       return;
     }
     if (typeof amount !== "number" || amount <= 0 || !Number.isFinite(amount)) {
-      res.status(400).json({ error: "amount must be a positive number", code: "VALIDATION_ERROR" });
+      res.status(400).json({ error: MSG.AMOUNT_MUST_BE_POSITIVE, code: "VALIDATION_ERROR" });
       return;
     }
     const result = await tokenService.credit(userId, amount, description || "Admin credit");
@@ -65,11 +66,11 @@ class TokenController {
   async debit(req: Request, res: Response): Promise<void> {
     const { userId, amount, description } = req.body;
     if (!userId || typeof userId !== "string") {
-      res.status(400).json({ error: "userId is required and must be a string", code: "VALIDATION_ERROR" });
+      res.status(400).json({ error: MSG.USER_ID_REQUIRED, code: "VALIDATION_ERROR" });
       return;
     }
     if (typeof amount !== "number" || amount <= 0 || !Number.isFinite(amount)) {
-      res.status(400).json({ error: "amount must be a positive number", code: "VALIDATION_ERROR" });
+      res.status(400).json({ error: MSG.AMOUNT_MUST_BE_POSITIVE, code: "VALIDATION_ERROR" });
       return;
     }
     const result = await tokenService.debit(userId, amount, description || "Admin debit");
@@ -79,11 +80,11 @@ class TokenController {
   async adjust(req: Request, res: Response): Promise<void> {
     const { userId, amount, description } = req.body;
     if (!userId || typeof userId !== "string") {
-      res.status(400).json({ error: "userId is required and must be a string", code: "VALIDATION_ERROR" });
+      res.status(400).json({ error: MSG.USER_ID_REQUIRED, code: "VALIDATION_ERROR" });
       return;
     }
     if (typeof amount !== "number" || !Number.isFinite(amount)) {
-      res.status(400).json({ error: "amount must be a finite number", code: "VALIDATION_ERROR" });
+      res.status(400).json({ error: MSG.AMOUNT_FINITE, code: "VALIDATION_ERROR" });
       return;
     }
     const result = await tokenService.adjust(userId, amount, description || "Admin adjustment");
@@ -95,7 +96,7 @@ class TokenController {
     const { prompt_tokens, completion_tokens, total_tokens, model, request_type, request_id, metadata } = req.body;
 
     if (!total_tokens || total_tokens <= 0) {
-      res.status(400).json({ error: "total_tokens is required and must be > 0" });
+      res.status(400).json({ error: MSG.TOTAL_TOKENS_POSITIVE });
       return;
     }
 

@@ -14,6 +14,7 @@ import { analyticsService } from "../services/analytics.service";
 import { usersRepo } from "../db/index";
 import { asyncHandler } from "../middleware/error.middleware";
 import { verifyAccessToken } from "../utils/jwt.util";
+import { MSG } from "../constants/messages";
 
 const router = Router();
 
@@ -105,7 +106,7 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
   const userId = await authenticateClient(req);
   if (!userId) {
     res.status(401).json({
-      error: { message: "Invalid API key", type: "authentication_error" },
+      error: { message: MSG.INVALID_API_KEY, type: "authentication_error" },
     });
     return;
   }

@@ -3,6 +3,7 @@
  */
 
 import { Errors } from "../core/errors/api-error";
+import { MSG } from "../constants/messages";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -28,7 +29,7 @@ export interface PaginationParams {
 export const CommonValidator = {
   validateUUID(value: unknown, fieldName = "ID"): string {
     if (!value || typeof value !== "string" || !UUID_REGEX.test(value)) {
-      throw Errors.validation(`Invalid ${fieldName}`);
+      throw Errors.validation(MSG.INVALID_UUID(fieldName));
     }
     return value;
   },
@@ -44,18 +45,18 @@ export const CommonValidator = {
 
   validatePositiveNumber(value: unknown, fieldName: string): number {
     if (typeof value !== "number" || value <= 0 || !Number.isFinite(value)) {
-      throw Errors.validation(`${fieldName} must be positive number`);
+      throw Errors.validation(MSG.MUST_BE_POSITIVE(fieldName));
     }
     return value;
   },
 
   validateString(value: unknown, fieldName: string, minLen = 1, maxLen = 1000): string {
     if (!value || typeof value !== "string") {
-      throw Errors.validation(`${fieldName} is required`);
+      throw Errors.validation(MSG.FIELD_REQUIRED(fieldName));
     }
     const trimmed = value.trim();
     if (trimmed.length < minLen || trimmed.length > maxLen) {
-      throw Errors.validation(`${fieldName} must be ${minLen}-${maxLen} characters`);
+      throw Errors.validation(MSG.FIELD_LENGTH(fieldName, minLen, maxLen));
     }
     return trimmed;
   },
@@ -65,25 +66,25 @@ export const CommonValidator = {
       return undefined;
     }
     if (typeof value !== "string") {
-      throw Errors.validation("Invalid string value");
+      throw Errors.validation(MSG.INVALID_STRING);
     }
     const trimmed = value.trim();
     if (trimmed.length > 0 && (trimmed.length < minLen || trimmed.length > maxLen)) {
-      throw Errors.validation(`String must be ${minLen}-${maxLen} characters`);
+      throw Errors.validation(MSG.FIELD_LENGTH("Chuỗi", minLen, maxLen));
     }
     return trimmed.length > 0 ? trimmed : undefined;
   },
 
   validateEnum<T extends string>(value: unknown, validValues: readonly T[], fieldName: string): T {
     if (!validValues.includes(value as T)) {
-      throw Errors.validation(`Invalid ${fieldName}`);
+      throw Errors.validation(MSG.INVALID_ENUM(fieldName));
     }
     return value as T;
   },
 
   validateBoolean(value: unknown, fieldName: string): boolean {
     if (typeof value !== "boolean") {
-      throw Errors.validation(`${fieldName} must be boolean`);
+      throw Errors.validation(MSG.MUST_BE_BOOLEAN(fieldName));
     }
     return value;
   },

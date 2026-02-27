@@ -5,6 +5,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { depositService } from "../services/deposit.service";
 import type { DepositType } from "../db/models/deposits";
+import { MSG } from "../constants/messages";
 
 /**
  * Get pricing info
@@ -35,7 +36,7 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
         const pricing = await depositService.getPricingInfo();
         const pkg = pricing.packages.find((p) => p.id === tierId);
         if (!pkg) {
-          res.status(400).json({ error: `Invalid tierId: ${tierId}`, code: "BAD_REQUEST" });
+          res.status(400).json({ error: MSG.INVALID_TIER(tierId), code: "BAD_REQUEST" });
           return;
         }
         tokenAmount = pkg.tokens;
@@ -43,7 +44,7 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
       }
 
       if (!tokenAmount) {
-        res.status(400).json({ error: "tokenAmount or tierId is required", code: "BAD_REQUEST" });
+        res.status(400).json({ error: MSG.TOKEN_OR_TIER_REQUIRED, code: "BAD_REQUEST" });
         return;
       }
 
@@ -55,14 +56,14 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
       res.status(201).json(order);
     } else if (type === "order") {
       if (!amountVnd) {
-        res.status(400).json({ error: "amountVnd is required for order payments", code: "BAD_REQUEST" });
+        res.status(400).json({ error: MSG.AMOUNT_VND_REQUIRED, code: "BAD_REQUEST" });
         return;
       }
 
       const order = await depositService.createDeposit(userId, { type: "order", amountVnd });
       res.status(201).json(order);
     } else {
-      res.status(400).json({ error: "Invalid type. Must be 'token' or 'order'", code: "BAD_REQUEST" });
+      res.status(400).json({ error: MSG.INVALID_DEPOSIT_TYPE, code: "BAD_REQUEST" });
     }
   } catch (error) {
     next(error);
@@ -198,7 +199,7 @@ export async function adminUpdatePricing(req: Request, res: Response, next: Next
   try {
     const { packages } = req.body;
     if (!Array.isArray(packages) || packages.length === 0) {
-      res.status(400).json({ error: "packages array is required", code: "BAD_REQUEST" });
+      res.status(400).json({ error: MSG.PACKAGES_REQUIRED, code: "BAD_REQUEST" });
       return;
     }
 

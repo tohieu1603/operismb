@@ -5,6 +5,7 @@
 import { Errors } from "../core/errors/api-error";
 import { reviewsRepo, productsRepo, usersRepo } from "../db/index";
 import type { Review, ReviewSummary } from "../db/models/reviews";
+import { MSG } from "../constants/messages";
 
 class ReviewService {
   async getProductReviews(
@@ -36,7 +37,7 @@ class ReviewService {
     content?: string,
   ): Promise<Review> {
     // Validate rating
-    if (rating < 1 || rating > 5) throw Errors.badRequest("Rating must be 1-5");
+    if (rating < 1 || rating > 5) throw Errors.badRequest(MSG.RATING_RANGE);
 
     // Check product exists
     const product = await productsRepo.getProductBySlug(productSlug);
@@ -44,7 +45,7 @@ class ReviewService {
 
     // Check user hasn't already reviewed
     const existing = await reviewsRepo.getUserReviewForProduct(userId, productSlug);
-    if (existing) throw Errors.conflict("You have already reviewed this product");
+    if (existing) throw Errors.conflict(MSG.DUPLICATE_REVIEW);
 
     // Get user name for author
     const user = await usersRepo.getUserById(userId);

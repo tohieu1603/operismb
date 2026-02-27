@@ -13,6 +13,7 @@ import {
   getRefreshTokenExpiryDate,
 } from "../utils/jwt.util";
 import type { SafeUser } from "../core/types/entities";
+import { MSG } from "../constants/messages";
 
 export interface AuthResult {
   user: SafeUser;
@@ -52,7 +53,7 @@ class AuthService {
 
   async register(email: string, password: string, name: string, meta?: AuthMeta): Promise<AuthResult> {
     const existing = await usersRepo.getUserByEmail(email);
-    if (existing) throw Errors.conflict("Registration failed");
+    if (existing) throw Errors.conflict(MSG.REGISTRATION_FAILED);
 
     const user = await usersRepo.createUser({
       email,
@@ -177,11 +178,11 @@ class AuthService {
     auth_profiles_path?: string;
   }): Promise<SafeUser> {
     const existing = await usersRepo.getUserByEmail(params.email);
-    if (existing) throw Errors.conflict("Email already exists");
+    if (existing) throw Errors.conflict(MSG.EMAIL_EXISTS);
 
     if (params.unique_machine) {
       const machineUser = await usersRepo.getUserByMachine(params.unique_machine);
-      if (machineUser) throw Errors.conflict("Machine ID already in use");
+      if (machineUser) throw Errors.conflict(MSG.MACHINE_ID_EXISTS);
     }
 
     const user = await usersRepo.createUser({

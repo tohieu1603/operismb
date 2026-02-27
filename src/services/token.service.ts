@@ -6,6 +6,7 @@ import { usersRepo, tokenTransactionsRepo, tokenUsageRepo } from "../db/index";
 import { Errors } from "../core/errors/api-error";
 import { sanitizeUser } from "../utils/sanitize.util";
 import type { SafeUser, TokenTransaction } from "../core/types/entities";
+import { MSG } from "../constants/messages";
 import type { RequestType } from "../db/models/types";
 
 export interface TransactionResult {
@@ -112,7 +113,7 @@ class TokenService {
   ): Promise<{ balance: number; deducted: number; usage_id: string }> {
     const costTokens = usage.total_tokens;
     if (costTokens <= 0) {
-      throw Errors.badRequest("total_tokens must be greater than 0");
+      throw Errors.badRequest(MSG.TOTAL_TOKENS_POSITIVE);
     }
 
     const user = await usersRepo.getUserById(userId);

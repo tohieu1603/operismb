@@ -4,6 +4,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
+import { MSG, LOG } from "../constants/messages";
 
 // Read allowed hosts from environment
 const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS || "localhost,127.0.0.1")
@@ -47,9 +48,9 @@ export function allowHostsMiddleware(req: Request, res: Response, next: NextFunc
   }
 
   // Reject
-  console.warn(`[api] Blocked request from: ${clientIp} / ${host} / ${origin}`);
+  console.warn(LOG.HOST_BLOCKED(clientIp, host, origin));
   res.status(403).json({
-    error: "Access denied",
+    error: MSG.ACCESS_DENIED,
     code: "FORBIDDEN",
   });
 }

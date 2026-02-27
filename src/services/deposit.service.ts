@@ -3,12 +3,13 @@
  * Package-based pricing (fixed packages, not per-token)
  */
 
-import { Errors } from "../core/errors/api-error";
+import { Errors, ApiError, ErrorCode } from "../core/errors/api-error";
 import { depositsRepo, usersRepo, settingsRepo } from "../db/index";
 import { AppDataSource } from "../db/data-source";
 import { creditTokensWithClient } from "../db/models/token-transactions";
 import { tokenService } from "./token.service";
 import type { DepositOrder, DepositType } from "../db/models/deposits";
+import { MSG } from "../constants/messages";
 
 // SePay configuration
 const SEPAY_BANK_CODE = process.env.SEPAY_BANK_CODE || "BIDV";
@@ -68,17 +69,17 @@ class DepositService {
 
     if (isToken) {
       if (!input.tokenAmount)
-        throw Errors.badRequest("tokenAmount is required for token deposits");
+        throw Errors.badRequest(MSG.TOKEN_OR_TIER_REQUIRED);
       if (input.tokenAmount < 100000)
-        throw Errors.badRequest("Minimum deposit is 100,000 tokens");
+        throw Errors.badRequest(MSG.MIN_DEPOSIT_TOKENS);
       tokenAmount = input.tokenAmount;
       // Use explicit amountVnd (from package price) if provided, else calculate from per-token rate
       amountVnd = input.amountVnd ?? depositsRepo.calculateVndFromTokens(tokenAmount);
     } else {
       if (!input.amountVnd)
-        throw Errors.badRequest("amountVnd is required for order payments");
+        throw Errors.badRequest(MSG.AMOUNT_VND_REQUIRED);
       if (input.amountVnd < 1000)
-        throw Errors.badRequest("Minimum amount is 1,000 VND");
+        throw Errors.badRequest(MSG.MIN_AMOUNT_VND);
       tokenAmount = 0;
       amountVnd = input.amountVnd;
     }
@@ -159,7 +160,7 @@ class DepositService {
     );
     if (!order) throw Errors.notFound("Deposit order");
     if (order.status !== "pending") {
-      throw Errors.badRequest("Only pending orders can be cancelled");
+      throw Errors.badRequest(MSG.ONLY_PENDING_CANCEL);
     }
 
     await depositsRepo.updateDepositOrderStatus(orderId, "cancelled");
@@ -354,7 +355,7 @@ class DepositService {
   ): Promise<{ newBalance: number }> {
     const admin = await usersRepo.getUserById(adminUserId);
     if (!admin || admin.role !== "admin") {
-      throw Errors.forbidden("Admin access required");
+      throw new ApiError(ErrorCode.FORBIDDEN, MSG.ADMIN_REQUIRED);
     }
 
     const user = await usersRepo.getUserById(targetUserId);
@@ -558,15 +559,15 @@ class DepositService {
     // Validate packages
     for (const pkg of packages) {
       if (!pkg.id || !pkg.name)
-        throw Errors.badRequest("Each package must have id and name");
+        throw Errors.badRequest(MSG.PACKAGE_ID_NAME_REQUIRED);
       if (pkg.priceVnd < 0)
-        throw Errors.badRequest(`Package '${pkg.id}': priceVnd must be >= 0`);
+        throw Errors.badRequest(MSG.PACKAGE_PRICE_INVALID(pkg.id));
     }
 
     // Check for duplicate IDs
     const ids = packages.map((p) => p.id);
     if (new Set(ids).size !== ids.length) {
-      throw Errors.badRequest("Package IDs must be unique");
+      throw Errors.badRequest(MSG.DUPLICATE_PACKAGE_ID);
     }
 
     await settingsRepo.setSetting("deposit_pricing", JSON.stringify(packages));

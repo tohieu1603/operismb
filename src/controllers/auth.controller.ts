@@ -15,6 +15,7 @@ import {
 import { provisionTunnel, type ProvisionResult } from "../services/cloudflare-tunnel.service";
 import { verifyRefreshToken } from "../utils/jwt.util";
 import { getUserById } from "../db/models/users";
+import { setAuthCookies, clearAuthCookies, REFRESH_COOKIE } from "../utils/cookie.util";
 
 /** Provision CF tunnel, return result or null on failure (never throws) */
 async function safeProvisionTunnel(userId: string, email: string): Promise<ProvisionResult | null> {
@@ -36,7 +37,9 @@ class AuthController {
     pushAuthProfilesToGateway(result.user.id);
     // Auto-provision CF tunnel → return token in response for Electron to start cloudflared
     const tunnel = await safeProvisionTunnel(result.user.id, email);
-    res.status(201).json({ ...result, tunnel });
+    // Set HttpOnly cookies (tokens no longer exposed in response body)
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    res.status(201).json({ user: result.user, expiresIn: result.expiresIn, tunnel });
   }
 
   async login(req: Request, res: Response): Promise<void> {
@@ -48,17 +51,26 @@ class AuthController {
     pushAuthProfilesToGateway(result.user.id);
     // Auto-provision CF tunnel (idempotent) → return token in response
     const tunnel = await safeProvisionTunnel(result.user.id, email);
-    res.json({ ...result, tunnel });
+    // Set HttpOnly cookies (tokens no longer exposed in response body)
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    res.json({ user: result.user, expiresIn: result.expiresIn, tunnel });
   }
 
   async refresh(req: Request, res: Response): Promise<void> {
-    const { refreshToken } = req.body;
+    // Read refresh token from HttpOnly cookie, fallback to body (API key clients)
+    const refreshToken = req.cookies?.[REFRESH_COOKIE] ?? req.body?.refreshToken;
+    if (!refreshToken) {
+      res.status(400).json({ error: "No refresh token provided" });
+      return;
+    }
     const result = await authService.refresh(refreshToken);
-    res.json(result);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    res.json({ expiresIn: result.expiresIn });
   }
 
   async logout(req: Request, res: Response): Promise<void> {
-    const { refreshToken } = req.body ?? {};
+    // Read refresh token from cookie or body
+    const refreshToken = req.cookies?.[REFRESH_COOKIE] ?? req.body?.refreshToken ?? undefined;
     // Use userId from access token (auth middleware) as primary; fallback to refreshToken claims
     const userId = req.user?.userId
       ?? (refreshToken ? verifyRefreshToken(refreshToken)?.userId : null)
@@ -74,6 +86,8 @@ class AuthController {
       clearAuthProfilesViaGateway(userId);
     }
     clearAuthProfiles(authProfilesPath);
+    // Clear HttpOnly cookies
+    clearAuthCookies(res);
     res.json({ success: true });
   }
 

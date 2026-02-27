@@ -4,6 +4,7 @@
 
 import type { ValidationResult } from "./common.validator";
 import { escapeHtml } from "../utils/sanitize.util";
+import { MSG } from "../constants/messages";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -51,32 +52,32 @@ export function validateRegister(body: unknown): ValidationResult<RegisterDTO> {
   const errors: string[] = [];
 
   if (!body || typeof body !== "object") {
-    return { valid: false, errors: ["Request body required"], data: null };
+    return { valid: false, errors: [MSG.REQUEST_BODY_REQUIRED], data: null };
   }
 
   const { email, password, name } = body as Record<string, unknown>;
 
   // Email validation
   if (!email || typeof email !== "string") {
-    errors.push("Email is required");
+    errors.push(MSG.EMAIL_REQUIRED);
   } else if (!EMAIL_REGEX.test(email.trim())) {
-    errors.push("Invalid email format");
+    errors.push(MSG.EMAIL_INVALID);
   }
 
   // Password validation
   if (!password || typeof password !== "string") {
-    errors.push("Password is required");
+    errors.push(MSG.PASSWORD_REQUIRED);
   } else if (password.length < MIN_PASSWORD_LENGTH) {
-    errors.push(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    errors.push(MSG.PASSWORD_MIN_LENGTH);
   }
 
   // Name validation
   if (!name || typeof name !== "string") {
-    errors.push("Name is required");
+    errors.push(MSG.NAME_REQUIRED);
   } else {
     const trimmedName = name.trim();
     if (trimmedName.length < MIN_NAME_LENGTH || trimmedName.length > MAX_NAME_LENGTH) {
-      errors.push(`Name must be ${MIN_NAME_LENGTH}-${MAX_NAME_LENGTH} characters`);
+      errors.push(MSG.NAME_LENGTH);
     }
   }
 
@@ -100,17 +101,17 @@ export function validateRegister(body: unknown): ValidationResult<RegisterDTO> {
  */
 export function validateLogin(body: unknown): ValidationResult<LoginDTO> {
   if (!body || typeof body !== "object") {
-    return { valid: false, errors: ["Invalid request"], data: null };
+    return { valid: false, errors: [MSG.INVALID_REQUEST], data: null };
   }
 
   const { email, password } = body as Record<string, unknown>;
 
   // Generic error - don't reveal which field is wrong
   if (!email || typeof email !== "string" || !email.trim()) {
-    return { valid: false, errors: ["Invalid request"], data: null };
+    return { valid: false, errors: [MSG.INVALID_REQUEST], data: null };
   }
   if (!password || typeof password !== "string") {
-    return { valid: false, errors: ["Invalid request"], data: null };
+    return { valid: false, errors: [MSG.INVALID_REQUEST], data: null };
   }
 
   return {
@@ -128,13 +129,13 @@ export function validateLogin(body: unknown): ValidationResult<LoginDTO> {
  */
 export function validateRefresh(body: unknown): ValidationResult<RefreshTokenDTO> {
   if (!body || typeof body !== "object") {
-    return { valid: false, errors: ["Request body required"], data: null };
+    return { valid: false, errors: [MSG.REQUEST_BODY_REQUIRED], data: null };
   }
 
   const { refreshToken } = body as Record<string, unknown>;
 
   if (!refreshToken || typeof refreshToken !== "string") {
-    return { valid: false, errors: ["Refresh token is required"], data: null };
+    return { valid: false, errors: [MSG.REFRESH_TOKEN_REQUIRED], data: null };
   }
 
   return {
@@ -151,19 +152,19 @@ export function validateChangePassword(body: unknown): ValidationResult<ChangePa
   const errors: string[] = [];
 
   if (!body || typeof body !== "object") {
-    return { valid: false, errors: ["Request body required"], data: null };
+    return { valid: false, errors: [MSG.REQUEST_BODY_REQUIRED], data: null };
   }
 
   const { currentPassword, newPassword } = body as Record<string, unknown>;
 
   if (!currentPassword || typeof currentPassword !== "string") {
-    errors.push("Current password is required");
+    errors.push(MSG.CURRENT_PASSWORD_REQUIRED);
   }
 
   if (!newPassword || typeof newPassword !== "string") {
-    errors.push("New password is required");
+    errors.push(MSG.NEW_PASSWORD_REQUIRED);
   } else if (newPassword.length < MIN_PASSWORD_LENGTH) {
-    errors.push(`New password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    errors.push(MSG.NEW_PASSWORD_MIN_LENGTH);
   }
 
   if (errors.length > 0) {
@@ -187,46 +188,46 @@ export function validateCreateUser(body: unknown): ValidationResult<CreateUserDT
   const errors: string[] = [];
 
   if (!body || typeof body !== "object") {
-    return { valid: false, errors: ["Request body required"], data: null };
+    return { valid: false, errors: [MSG.REQUEST_BODY_REQUIRED], data: null };
   }
 
   const { email, password, name, role, is_active, token_balance, unique_machine, gateway_url, gateway_token, gateway_hooks_token, auth_profiles_path } = body as Record<string, unknown>;
 
   if (!email || typeof email !== "string") {
-    errors.push("Email is required");
+    errors.push(MSG.EMAIL_REQUIRED);
   } else if (!EMAIL_REGEX.test(email.trim())) {
-    errors.push("Invalid email format");
+    errors.push(MSG.EMAIL_INVALID);
   }
 
   if (!password || typeof password !== "string") {
-    errors.push("Password is required");
+    errors.push(MSG.PASSWORD_REQUIRED);
   } else if (password.length < MIN_PASSWORD_LENGTH) {
-    errors.push(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    errors.push(MSG.PASSWORD_MIN_LENGTH);
   }
 
   if (!name || typeof name !== "string") {
-    errors.push("Name is required");
+    errors.push(MSG.NAME_REQUIRED);
   } else {
     const trimmedName = name.trim();
     if (trimmedName.length < MIN_NAME_LENGTH || trimmedName.length > MAX_NAME_LENGTH) {
-      errors.push(`Name must be ${MIN_NAME_LENGTH}-${MAX_NAME_LENGTH} characters`);
+      errors.push(MSG.NAME_LENGTH);
     }
   }
 
   if (role !== undefined && role !== "admin" && role !== "user") {
-    errors.push("Role must be 'admin' or 'user'");
+    errors.push(MSG.ROLE_INVALID);
   }
 
   if (token_balance !== undefined && (typeof token_balance !== "number" || token_balance < 0)) {
-    errors.push("Token balance must be a non-negative number");
+    errors.push(MSG.TOKEN_BALANCE_INVALID);
   }
 
   if (unique_machine !== undefined && (typeof unique_machine !== "string" || unique_machine.length > 255)) {
-    errors.push("Unique machine must be a string (max 255 characters)");
+    errors.push(MSG.UNIQUE_MACHINE_INVALID);
   }
 
   if (is_active !== undefined && typeof is_active !== "boolean") {
-    errors.push("is_active must be a boolean");
+    errors.push(MSG.IS_ACTIVE_INVALID);
   }
 
   if (gateway_url !== undefined && typeof gateway_url !== "string") {

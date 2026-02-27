@@ -5,6 +5,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
+import { MSG } from "../constants/messages";
 
 const OPENCLAW_WEBHOOK_KEY = process.env.OPENCLAW_WEBHOOK_KEY || "";
 
@@ -26,7 +27,7 @@ export function openclawWebhookMiddleware(req: Request, res: Response, next: Nex
     : authHeader;
 
   if (providedKey !== OPENCLAW_WEBHOOK_KEY) {
-    res.status(401).json({ error: "Invalid webhook key" });
+    res.status(401).json({ error: MSG.INVALID_WEBHOOK_KEY });
     return;
   }
 

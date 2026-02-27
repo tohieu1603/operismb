@@ -2,6 +2,8 @@
  * API Error Classes and Factory
  */
 
+import { MSG } from "../../constants/messages";
+
 export enum ErrorCode {
   // Auth errors
   UNAUTHORIZED = "UNAUTHORIZED",
@@ -87,23 +89,23 @@ export class ApiError extends Error {
  */
 export const Errors = {
   // Auth errors
-  unauthorized: (message = "Authentication required") =>
+  unauthorized: (message = MSG.AUTH_REQUIRED) =>
     new ApiError(ErrorCode.UNAUTHORIZED, message),
 
   invalidCredentials: () =>
-    new ApiError(ErrorCode.INVALID_CREDENTIALS, "Invalid email or password"),
+    new ApiError(ErrorCode.INVALID_CREDENTIALS, MSG.INVALID_CREDENTIALS),
 
-  invalidToken: () => new ApiError(ErrorCode.INVALID_TOKEN, "Invalid or expired token"),
+  invalidToken: () => new ApiError(ErrorCode.INVALID_TOKEN, MSG.INVALID_TOKEN),
 
-  tokenExpired: () => new ApiError(ErrorCode.TOKEN_EXPIRED, "Token has expired"),
+  tokenExpired: () => new ApiError(ErrorCode.TOKEN_EXPIRED, MSG.TOKEN_EXPIRED),
 
   accountDeactivated: () =>
-    new ApiError(ErrorCode.ACCOUNT_DEACTIVATED, "Account has been deactivated"),
+    new ApiError(ErrorCode.ACCOUNT_DEACTIVATED, MSG.ACCOUNT_DEACTIVATED),
 
-  forbidden: (message = "Access denied") => new ApiError(ErrorCode.FORBIDDEN, message),
+  forbidden: (message = MSG.ACCESS_DENIED) => new ApiError(ErrorCode.FORBIDDEN, message),
 
   // Resource errors
-  notFound: (resource: string) => new ApiError(ErrorCode.NOT_FOUND, `${resource} not found`),
+  notFound: (resource: string) => new ApiError(ErrorCode.NOT_FOUND, MSG.NOT_FOUND(resource)),
 
   conflict: (message: string) => new ApiError(ErrorCode.CONFLICT, message),
 
@@ -116,7 +118,7 @@ export const Errors = {
   insufficientBalance: (current: number, required: number) =>
     new ApiError(
       ErrorCode.INSUFFICIENT_BALANCE,
-      `Insufficient token balance. Current: ${current}, Required: ${required}`,
+      MSG.INSUFFICIENT_BALANCE(current, required),
       400,
       {
         current,
@@ -126,7 +128,7 @@ export const Errors = {
 
   // System errors
   serviceUnavailable: (service: string) =>
-    new ApiError(ErrorCode.SERVICE_UNAVAILABLE, `${service} service is temporarily unavailable`),
+    new ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG.SERVICE_UNAVAILABLE(service)),
 
-  internal: (message = "Internal server error") => new ApiError(ErrorCode.INTERNAL_ERROR, message),
+  internal: (message = MSG.INTERNAL_ERROR) => new ApiError(ErrorCode.INTERNAL_ERROR, message),
 };

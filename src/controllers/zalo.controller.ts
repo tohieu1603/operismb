@@ -5,6 +5,7 @@
 
 import type { Request, Response } from "express";
 import { zaloService } from "../services/zalo.service";
+import { MSG } from "../constants/messages";
 
 class ZaloController {
   /** POST /zalo/connect — start QR login */
@@ -18,12 +19,12 @@ class ZaloController {
   async status(req: Request, res: Response): Promise<void> {
     const token = req.query.token as string;
     if (!token) {
-      res.status(400).json({ error: "Missing token parameter" });
+      res.status(400).json({ error: MSG.MISSING_TOKEN_PARAM });
       return;
     }
     const result = zaloService.getStatus(token);
     if (!result) {
-      res.status(404).json({ error: "Session not found or expired" });
+      res.status(404).json({ error: MSG.SESSION_NOT_FOUND });
       return;
     }
     res.json(result);
@@ -68,7 +69,7 @@ class ZaloController {
     } = req.body;
 
     if (!user_id || input_tokens == null || output_tokens == null) {
-      res.status(400).json({ error: "Missing required fields: user_id, input_tokens, output_tokens" });
+      res.status(400).json({ error: MSG.MISSING_USAGE_FIELDS });
       return;
     }
 
@@ -96,7 +97,7 @@ class ZaloController {
     const required = parseInt(req.query.required as string) || 0;
 
     if (!userId) {
-      res.status(400).json({ error: "Missing user_id parameter" });
+      res.status(400).json({ error: MSG.MISSING_USER_ID_PARAM });
       return;
     }
 

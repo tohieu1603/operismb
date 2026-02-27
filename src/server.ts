@@ -7,6 +7,7 @@ import "dotenv/config";
 import cluster from "node:cluster";
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import swaggerUi from "swagger-ui-express";
 import { operisRouter } from "./index";
 import { allowHostsMiddleware } from "./middleware/allow-hosts.middleware";
@@ -68,6 +69,7 @@ async function main() {
   );
 
   app.use(express.json({ limit: "50mb" }));
+  app.use(cookieParser());
   app.use(allowHostsMiddleware);
 
   // Debug: log all incoming requests

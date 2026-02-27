@@ -11,9 +11,10 @@
  * - Log requests
  */
 
-import { Errors } from "../core/errors/api-error";
+import { Errors, ApiError, ErrorCode } from "../core/errors/api-error";
 import { tokenService } from "./token.service";
 import { usersRepo } from "../db/index";
+import { MSG } from "../constants/messages";
 
 // Config
 const GATEWAY_TIMEOUT_MS = 120_000;
@@ -112,9 +113,7 @@ class GatewayProxyService {
     if (!user.is_active) throw Errors.accountDeactivated();
 
     if (!user.gateway_url || !user.gateway_token) {
-      throw Errors.serviceUnavailable(
-        "Gateway not configured. Please set gateway_url and gateway_token in your profile."
-      );
+      throw new ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG.GATEWAY_NOT_CONFIGURED);
     }
 
     // For hooks endpoints, use hooks_token if available
@@ -190,7 +189,7 @@ class GatewayProxyService {
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (error.name === "AbortError") {
-        throw Errors.serviceUnavailable("Gateway timeout");
+        throw new ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG.GATEWAY_TIMEOUT);
       }
       throw error;
     }
@@ -209,7 +208,7 @@ class GatewayProxyService {
 
     // Validate
     if (!request.text?.trim()) {
-      throw Errors.badRequest("text is required");
+      throw Errors.badRequest(MSG.TEXT_REQUIRED);
     }
 
     // Check & deduct tokens
@@ -242,7 +241,7 @@ class GatewayProxyService {
 
     // Validate
     if (!request.message?.trim()) {
-      throw Errors.badRequest("message is required");
+      throw Errors.badRequest(MSG.MESSAGE_REQUIRED);
     }
 
     // Check & deduct tokens
@@ -322,7 +321,7 @@ class GatewayProxyService {
 
     // Validate
     if (!request.input || request.input.length === 0) {
-      throw Errors.badRequest("input is required");
+      throw Errors.badRequest(MSG.INPUT_REQUIRED);
     }
 
     // Estimate tokens from input
@@ -390,7 +389,7 @@ class GatewayProxyService {
 
       // Parse SSE stream
       const reader = response.body?.getReader();
-      if (!reader) throw Errors.serviceUnavailable("No response body");
+      if (!reader) throw new ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG.NO_RESPONSE_BODY);
 
       const decoder = new TextDecoder();
       let buffer = "";
@@ -427,7 +426,7 @@ class GatewayProxyService {
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (error.name === "AbortError") {
-        throw Errors.serviceUnavailable("Gateway timeout");
+        throw new ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG.GATEWAY_TIMEOUT);
       }
       throw error;
     }
@@ -479,7 +478,7 @@ class GatewayProxyService {
 
     // Validate
     if (!request.messages || request.messages.length === 0) {
-      throw Errors.badRequest("messages is required");
+      throw Errors.badRequest(MSG.MESSAGES_REQUIRED);
     }
 
     // Estimate tokens from input

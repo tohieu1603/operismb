@@ -3,9 +3,10 @@
  * Integrates with deposit system for SePay payments
  */
 
-import { Errors } from "../core/errors/api-error";
+import { Errors, ApiError, ErrorCode } from "../core/errors/api-error";
 import { transaction, depositsRepo, ordersRepo, settingsRepo } from "../db/index";
 import type { OrderWithItems, OrderStatus } from "../db/models/orders";
+import { MSG } from "../constants/messages";
 
 export interface CheckoutInput {
   items: { product_slug: string; quantity: number }[];
@@ -39,7 +40,7 @@ const ORDER_EXPIRY_MINUTES = 30;
 
 class OrderService {
   async checkout(userId: string, input: CheckoutInput): Promise<CheckoutResult> {
-    if (!input.items.length) throw Errors.badRequest("Cart is empty");
+    if (!input.items.length) throw Errors.badRequest(MSG.CART_EMPTY);
 
     // Get shipping fee from settings
     const shippingFeeSetting = await settingsRepo.getSetting("shipping_fee_vnd");
@@ -69,9 +70,9 @@ class OrderService {
           [item.product_slug],
         );
         const product = result.rows[0];
-        if (!product) throw Errors.notFound(`Product ${item.product_slug}`);
+        if (!product) throw Errors.notFound(MSG.PRODUCT_SLUG_NOT_FOUND(item.product_slug));
         if (product.stock < item.quantity) {
-          throw Errors.badRequest(`Insufficient stock for ${product.name} (available: ${product.stock})`);
+          throw Errors.badRequest(MSG.INSUFFICIENT_STOCK(product.name, product.stock));
         }
 
         // Decrement stock
@@ -234,7 +235,7 @@ class OrderService {
   async getOrderDetail(userId: string, orderId: string) {
     const order = await ordersRepo.getOrderById(orderId);
     if (!order) throw Errors.notFound("Order");
-    if (order.user_id !== userId) throw Errors.forbidden("Not your order");
+    if (order.user_id !== userId) throw new ApiError(ErrorCode.FORBIDDEN, MSG.NOT_YOUR_ORDER);
 
     const resolvedStatus = await this.resolveOrderStatus(order);
     const items = await ordersRepo.getOrderItems(order.id);
@@ -277,9 +278,9 @@ class OrderService {
   async cancelOrder(userId: string, orderId: string): Promise<{ success: boolean }> {
     const order = await ordersRepo.getOrderById(orderId);
     if (!order) throw Errors.notFound("Order");
-    if (order.user_id !== userId) throw Errors.forbidden("Not your order");
+    if (order.user_id !== userId) throw new ApiError(ErrorCode.FORBIDDEN, MSG.NOT_YOUR_ORDER);
     if (order.status !== "pending") {
-      throw Errors.badRequest("Only pending orders can be cancelled");
+      throw Errors.badRequest(MSG.ONLY_PENDING_CANCEL);
     }
 
     await ordersRepo.updateOrderStatus(orderId, "cancelled");

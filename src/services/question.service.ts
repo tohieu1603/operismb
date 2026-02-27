@@ -5,6 +5,7 @@
 import { Errors } from "../core/errors/api-error";
 import { questionsRepo, productsRepo, usersRepo } from "../db/index";
 import type { QuestionWithAnswers } from "../db/models/questions";
+import { MSG } from "../constants/messages";
 
 class QuestionService {
   async getProductQuestions(
@@ -35,7 +36,7 @@ class QuestionService {
     const product = await productsRepo.getProductBySlug(productSlug);
     if (!product) throw Errors.notFound("Product");
 
-    if (!content.trim()) throw Errors.badRequest("Question content is required");
+    if (!content.trim()) throw Errors.badRequest(MSG.QUESTION_CONTENT_REQUIRED);
 
     // Get user name for author
     const user = await usersRepo.getUserById(userId);
@@ -59,7 +60,7 @@ class QuestionService {
     const question = await questionsRepo.getQuestionById(questionId);
     if (!question) throw Errors.notFound("Question");
 
-    if (!content.trim()) throw Errors.badRequest("Answer content is required");
+    if (!content.trim()) throw Errors.badRequest(MSG.ANSWER_CONTENT_REQUIRED);
 
     await questionsRepo.createAnswer({
       question_id: questionId,

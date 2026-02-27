@@ -6,11 +6,12 @@
  */
 
 import crypto from "node:crypto";
-import { Errors } from "../core/errors/api-error";
+import { Errors, ApiError, ErrorCode } from "../core/errors/api-error";
 import { tokenService } from "./token.service";
 import { analyticsService } from "./analytics.service";
 import { usersRepo, chatMessagesRepo } from "../db/index";
 import { moltbotClientService } from "./moltbot-client.service";
+import { MSG } from "../constants/messages";
 
 // Config
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
@@ -116,7 +117,7 @@ class ChatService {
 
     // User must have gateway configured
     if (!user.gateway_url || !user.gateway_token) {
-      throw Errors.serviceUnavailable("Gateway not configured - please set gateway_url and gateway_token");
+      throw new ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG.GATEWAY_NOT_CONFIGURED);
     }
 
     const convId = options?.conversationId || this.generateConversationId();
@@ -286,7 +287,7 @@ class ChatService {
         if (!response.ok) {
           const errorText = await response.text();
           console.error("[chat] Gateway error:", errorText);
-          throw Errors.serviceUnavailable("Gateway error");
+          throw new ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG.GATEWAY_ERROR);
         }
 
         data = await response.json();
@@ -375,7 +376,7 @@ class ChatService {
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (error.name === "AbortError") {
-        throw Errors.serviceUnavailable("Gateway timeout");
+        throw new ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG.GATEWAY_TIMEOUT);
       }
       throw error;
     }

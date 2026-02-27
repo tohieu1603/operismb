@@ -7,6 +7,7 @@ import type { Request, Response } from "express";
 import { chatStreamService } from "../services/chat-stream.service";
 import { Errors } from "../core/errors/api-error";
 import { escapeHtml } from "../utils/sanitize.util";
+import { MSG } from "../constants/messages";
 
 class ChatStreamController {
   /**
@@ -18,7 +19,7 @@ class ChatStreamController {
 
     if (!message || typeof message !== "string") {
       res.status(400).json({
-        error: "Message is required",
+        error: MSG.MESSAGE_REQUIRED,
         code: "VALIDATION_ERROR",
       });
       return;

@@ -6,6 +6,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../middleware/index";
 import { updateUser, getUserByEmail } from "../db/models/users";
+import { MSG } from "../constants/messages";
 
 const REGISTER_SECRET = process.env.GATEWAY_REGISTER_SECRET || "operis-gateway-register-secret";
 
@@ -23,20 +24,20 @@ router.put(
     // Verify shared secret
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ") || authHeader.slice(7) !== REGISTER_SECRET) {
-      res.status(401).json({ error: "Invalid register secret" });
+      res.status(401).json({ error: MSG.INVALID_REGISTER_SECRET });
       return;
     }
 
     const { email, gateway_url, gateway_token, hooks_token } = req.body ?? {};
 
     if (!email) {
-      res.status(400).json({ error: "email is required" });
+      res.status(400).json({ error: MSG.REGISTER_EMAIL_REQUIRED });
       return;
     }
 
     const user = await getUserByEmail(email);
     if (!user) {
-      res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: MSG.USER_NOT_FOUND });
       return;
     }
 
@@ -45,7 +46,7 @@ router.put(
     if (hooks_token) updates.gateway_hooks_token = hooks_token;
 
     if (Object.keys(updates).length === 0) {
-      res.status(400).json({ error: "No fields to update" });
+      res.status(400).json({ error: MSG.NO_FIELDS_TO_UPDATE });
       return;
     }
 

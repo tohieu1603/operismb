@@ -15,7 +15,7 @@ import { Router } from "express";
 import { authController } from "../controllers/auth.controller";
 import { authMiddleware, optionalAuthMiddleware, adminMiddleware, asyncHandler } from "../middleware/index";
 import { validateBody } from "../middleware/validate.middleware";
-import { validateRegister, validateLogin, validateRefresh, validateChangePassword, validateCreateUser } from "../validators/auth.validator";
+import { validateRegister, validateLogin, validateChangePassword, validateCreateUser } from "../validators/auth.validator";
 import { loginLimiter, registerLimiter, passwordChangeLimiter } from "../middleware/rate-limit.middleware";
 
 const router = Router();
@@ -249,9 +249,9 @@ router.post(
  *
  *     security: []
  */
+// Refresh token comes from HttpOnly cookie (or body fallback), no body validation needed
 router.post(
   "/refresh",
-  validateBody(validateRefresh),
   asyncHandler((req, res) => authController.refresh(req, res)),
 );
 

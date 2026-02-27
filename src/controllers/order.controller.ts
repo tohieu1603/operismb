@@ -5,6 +5,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { orderService } from "../services/order.service";
 import type { OrderStatus } from "../db/models/orders";
+import { MSG } from "../constants/messages";
 
 export async function checkout(req: Request, res: Response, next: NextFunction) {
   try {
@@ -79,13 +80,13 @@ export async function adminUpdateOrderStatus(req: Request, res: Response, next: 
   try {
     const { status } = req.body;
     if (!status) {
-      res.status(400).json({ error: "status is required", code: "BAD_REQUEST" });
+      res.status(400).json({ error: MSG.STATUS_REQUIRED, code: "BAD_REQUEST" });
       return;
     }
 
     const validStatuses: OrderStatus[] = ["processing", "shipping", "delivered", "cancelled"];
     if (!validStatuses.includes(status)) {
-      res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`, code: "BAD_REQUEST" });
+      res.status(400).json({ error: MSG.INVALID_STATUS(validStatuses.join(", ")), code: "BAD_REQUEST" });
       return;
     }
 

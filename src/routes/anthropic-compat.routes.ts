@@ -8,6 +8,7 @@ import crypto from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import { apiKeyService } from "../services/api-key.service";
 import { asyncHandler } from "../middleware/error.middleware";
+import { MSG } from "../constants/messages";
 
 const router = Router();
 
@@ -183,7 +184,7 @@ router.post("/messages", asyncHandler(async (req: Request, res: Response) => {
         type: "error",
         error: {
           type: "authentication_error",
-          message: "Invalid API key",
+          message: MSG.INVALID_API_KEY,
         },
       });
       return;

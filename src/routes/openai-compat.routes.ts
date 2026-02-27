@@ -10,6 +10,7 @@ import { Router, type Request, type Response } from "express";
 import { chatService } from "../services/chat.service";
 import { apiKeyService } from "../services/api-key.service";
 import { asyncHandler } from "../middleware/error.middleware";
+import { MSG } from "../constants/messages";
 
 const router = Router();
 
@@ -121,7 +122,7 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
     if (!userId) {
       res.status(401).json({
         error: {
-          message: "Invalid API key",
+          message: MSG.INVALID_API_KEY,
           type: "invalid_request_error",
           code: "invalid_api_key",
         },

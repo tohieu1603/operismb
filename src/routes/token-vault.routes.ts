@@ -12,6 +12,7 @@ import { authMiddleware } from "../middleware/auth.middleware";
 import { settingsRepo } from "../db/models/settings";
 import { Errors } from "../core/errors/api-error";
 import { asyncHandler } from "../middleware/error.middleware";
+import { MSG } from "../constants/messages";
 
 const router = Router();
 
@@ -65,7 +66,7 @@ router.put("/", asyncHandler(async (req, res, next) => {
         : [];
 
     if (tokenList.length === 0 || tokenList.some((t: unknown) => typeof t !== "string" || !t)) {
-      throw Errors.validation("tokens array is required (non-empty strings)");
+      throw Errors.validation(MSG.TOKENS_ARRAY_REQUIRED);
     }
 
     // Encrypt each token individually, store as JSON array
@@ -85,7 +86,7 @@ router.get("/", asyncHandler(async (_req, res, next) => {
   try {
     const raw = await settingsRepo.getSetting(SETTINGS_KEY);
     if (!raw) {
-      throw Errors.notFound("No tokens stored");
+      throw Errors.notFound(MSG.NO_TOKENS_STORED);
     }
 
     const encryptedList: string[] = JSON.parse(raw);

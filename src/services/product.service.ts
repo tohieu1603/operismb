@@ -12,6 +12,7 @@ import type {
   ProductCreate,
   ProductUpdate,
 } from "../db/models/products";
+import { MSG } from "../constants/messages";
 
 /** Allowed product categories */
 export const PRODUCT_CATEGORIES = ["personal", "enterprise"] as const;
@@ -63,7 +64,7 @@ class ProductService {
 
   private validateCategory(category?: string): void {
     if (category && !PRODUCT_CATEGORIES.includes(category as ProductCategory)) {
-      throw Errors.badRequest(`Invalid category '${category}'. Must be one of: ${PRODUCT_CATEGORIES.join(", ")}`);
+      throw Errors.badRequest(MSG.INVALID_CATEGORY(category, PRODUCT_CATEGORIES.join(", ")));
     }
   }
 
@@ -77,7 +78,7 @@ class ProductService {
 
     // Check slug uniqueness
     const existing = await productsRepo.getProductBySlug(data.slug!);
-    if (existing) throw Errors.conflict("Product with this slug already exists");
+    if (existing) throw Errors.conflict(MSG.SLUG_EXISTS);
 
     const product = await productsRepo.createProduct(data);
 

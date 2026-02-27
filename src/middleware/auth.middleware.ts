@@ -8,6 +8,8 @@ import crypto from "node:crypto";
 import { verifyAccessToken, type TokenPayload } from "../utils/jwt.util";
 import { userApiKeysRepo } from "../db/index";
 import { Errors } from "../core/errors/api-error";
+import { MSG } from "../constants/messages";
+import { ACCESS_COOKIE } from "../utils/cookie.util";
 
 // Extend Express Request type
 declare global {
@@ -21,26 +23,32 @@ declare global {
 
 /**
  * JWT authentication middleware
- * Requires valid Bearer token
+ * Tries HttpOnly cookie first, then falls back to Bearer header
  */
 export function authMiddleware(req: Request, _res: Response, next: NextFunction): void {
+  // 1. Try HttpOnly cookie
+  const cookieToken = req.cookies?.[ACCESS_COOKIE];
+  if (cookieToken) {
+    const payload = verifyAccessToken(cookieToken);
+    if (payload) {
+      req.user = payload;
+      next();
+      return;
+    }
+  }
+
+  // 2. Fall back to Authorization: Bearer header
   const authHeader = req.headers.authorization;
-
-  if (!authHeader?.startsWith("Bearer ")) {
-    next(Errors.unauthorized("Authentication required"));
-    return;
+  if (authHeader?.startsWith("Bearer ")) {
+    const payload = verifyAccessToken(authHeader.slice(7));
+    if (payload) {
+      req.user = payload;
+      next();
+      return;
+    }
   }
 
-  const token = authHeader.slice(7);
-  const payload = verifyAccessToken(token);
-
-  if (!payload) {
-    next(Errors.invalidToken());
-    return;
-  }
-
-  req.user = payload;
-  next();
+  next(Errors.unauthorized(MSG.AUTH_REQUIRED));
 }
 
 /**
@@ -55,7 +63,7 @@ export async function apiKeyMiddleware(
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith("sk_")) {
-    next(Errors.unauthorized("Authentication required"));
+    next(Errors.unauthorized(MSG.AUTH_REQUIRED));
     return;
   }
 
@@ -86,39 +94,62 @@ export async function apiKeyMiddleware(
 }
 
 /**
- * Hybrid auth - accepts JWT or API key
+ * Hybrid auth - accepts cookie, JWT Bearer, or API key
  */
 export async function hybridAuthMiddleware(
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    next(Errors.unauthorized("Authentication required"));
-    return;
+  // 1. Try HttpOnly cookie
+  const cookieToken = req.cookies?.[ACCESS_COOKIE];
+  if (cookieToken) {
+    const payload = verifyAccessToken(cookieToken);
+    if (payload) {
+      req.user = payload;
+      next();
+      return;
+    }
   }
 
-  // Try JWT first
-  if (authHeader.startsWith("Bearer ")) {
+  const authHeader = req.headers.authorization;
+
+  // 2. Try JWT Bearer header
+  if (authHeader?.startsWith("Bearer ")) {
     authMiddleware(req, res, next);
     return;
   }
 
-  // Try API key
-  if (authHeader.startsWith("sk_")) {
+  // 3. Try API key
+  if (authHeader?.startsWith("sk_")) {
     await apiKeyMiddleware(req, res, next);
     return;
   }
 
-  next(Errors.unauthorized("Authentication required"));
+  // No valid auth source found
+  if (!authHeader && !cookieToken) {
+    next(Errors.unauthorized(MSG.AUTH_REQUIRED));
+    return;
+  }
+
+  next(Errors.unauthorized(MSG.AUTH_REQUIRED));
 }
 
 /**
- * Optional JWT auth - parse token if present, skip if missing/invalid
+ * Optional JWT auth - parse cookie or Bearer token if present, skip if missing/invalid
  */
 export function optionalAuthMiddleware(req: Request, _res: Response, next: NextFunction): void {
+  // Try cookie first
+  const cookieToken = req.cookies?.[ACCESS_COOKIE];
+  if (cookieToken) {
+    const payload = verifyAccessToken(cookieToken);
+    if (payload) {
+      req.user = payload;
+      next();
+      return;
+    }
+  }
+  // Fall back to Bearer header
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
     const payload = verifyAccessToken(authHeader.slice(7));

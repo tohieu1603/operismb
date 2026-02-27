@@ -5,6 +5,7 @@
 
 import type { Request, Response } from "express";
 import { gatewayProxyService } from "../services/gateway-proxy.service";
+import { MSG } from "../constants/messages";
 
 // ============================================
 // Controller Functions
@@ -18,7 +19,7 @@ export async function wakeHandler(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ ok: false, error: "Unauthorized" });
+      res.status(401).json({ ok: false, error: MSG.UNAUTHORIZED });
       return;
     }
 
@@ -45,7 +46,7 @@ export async function agentHandler(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ ok: false, error: "Unauthorized" });
+      res.status(401).json({ ok: false, error: MSG.UNAUTHORIZED });
       return;
     }
 
@@ -94,13 +95,13 @@ export async function customHookHandler(req: Request, res: Response): Promise<vo
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ ok: false, error: "Unauthorized" });
+      res.status(401).json({ ok: false, error: MSG.UNAUTHORIZED });
       return;
     }
 
     const { hookName } = req.params;
     if (!hookName) {
-      res.status(400).json({ ok: false, error: "hookName is required" });
+      res.status(400).json({ ok: false, error: MSG.HOOK_NAME_REQUIRED });
       return;
     }
 
@@ -125,7 +126,7 @@ export async function responsesHandler(req: Request, res: Response): Promise<voi
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ ok: false, error: "Unauthorized" });
+      res.status(401).json({ ok: false, error: MSG.UNAUTHORIZED });
       return;
     }
 
@@ -194,14 +195,14 @@ export async function invokeToolHandler(req: Request, res: Response): Promise<vo
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ ok: false, error: "Unauthorized" });
+      res.status(401).json({ ok: false, error: MSG.UNAUTHORIZED });
       return;
     }
 
     const { tool, parameters } = req.body;
 
     if (!tool) {
-      res.status(400).json({ ok: false, error: "tool is required" });
+      res.status(400).json({ ok: false, error: MSG.TOOL_REQUIRED });
       return;
     }
 
@@ -226,7 +227,7 @@ export async function healthHandler(req: Request, res: Response): Promise<void> 
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ ok: false, error: "Unauthorized" });
+      res.status(401).json({ ok: false, error: MSG.UNAUTHORIZED });
       return;
     }
 
@@ -251,7 +252,7 @@ export async function chatCompletionsHandler(req: Request, res: Response): Promi
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ ok: false, error: "Unauthorized" });
+      res.status(401).json({ ok: false, error: MSG.UNAUTHORIZED });
       return;
     }
 

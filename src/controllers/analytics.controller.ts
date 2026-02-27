@@ -7,6 +7,7 @@ import type { Request, Response, NextFunction } from "express";
 import { analyticsService } from "../services/analytics.service";
 import { tokenService } from "../services/token.service";
 import type { RequestType } from "../db/models/types";
+import { MSG } from "../constants/messages";
 
 // ============================================================================
 // User Analytics
@@ -89,7 +90,7 @@ export async function getUserRange(req: Request, res: Response, next: NextFuncti
     const end = req.query.end as string;
 
     if (!start || !end) {
-      res.status(400).json({ error: "start and end dates are required" });
+      res.status(400).json({ error: MSG.FIELD_REQUIRED("start và end") });
       return;
     }
 
@@ -150,11 +151,11 @@ export async function reportUsage(req: Request, res: Response, next: NextFunctio
       req.body;
 
     if (!request_type || !["chat", "cronjob", "api"].includes(request_type)) {
-      res.status(400).json({ error: "Invalid request_type. Must be chat, cronjob, or api." });
+      res.status(400).json({ error: MSG.INVALID_ENUM("request_type") });
       return;
     }
     if (input_tokens == null && output_tokens == null) {
-      res.status(400).json({ error: "input_tokens or output_tokens required." });
+      res.status(400).json({ error: MSG.FIELD_REQUIRED("input_tokens hoặc output_tokens") });
       return;
     }
 
@@ -264,7 +265,7 @@ export async function getAdminRange(req: Request, res: Response, next: NextFunct
     const end = req.query.end as string;
 
     if (!start || !end) {
-      res.status(400).json({ error: "start and end dates are required" });
+      res.status(400).json({ error: MSG.FIELD_REQUIRED("start và end") });
       return;
     }
 

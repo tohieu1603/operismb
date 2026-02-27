@@ -4,6 +4,7 @@
 
 import type { ValidationResult } from "./common.validator";
 import { escapeHtml } from "../utils/sanitize.util";
+import { MSG } from "../constants/messages";
 
 // Cron schedule regex (basic validation - 5 or 6 fields)
 const CRON_REGEX = /^(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)(\s+(\*|[0-9,\-\/]+))?$/;
@@ -101,7 +102,7 @@ export function validateCreateCronjob(body: unknown): ValidationResult<CreateCro
   const errors: string[] = [];
 
   if (!body || typeof body !== "object") {
-    return { valid: false, errors: ["Request body required"], data: null };
+    return { valid: false, errors: [MSG.REQUEST_BODY_REQUIRED], data: null };
   }
 
   const {
@@ -137,175 +138,175 @@ export function validateCreateCronjob(body: unknown): ValidationResult<CreateCro
 
   // box_id validation (optional)
   if (box_id !== undefined && typeof box_id !== "string") {
-    errors.push("box_id must be a string");
+    errors.push(MSG.CRON_BOX_ID_STRING);
   }
 
   // name validation
   if (!name || typeof name !== "string") {
-    errors.push("name is required");
+    errors.push(MSG.CRON_NAME_REQUIRED);
   } else if (name.trim().length < 1 || name.trim().length > 100) {
-    errors.push("name must be 1-100 characters");
+    errors.push(MSG.CRON_NAME_LENGTH);
   }
 
   // description validation (optional)
   if (description !== undefined && typeof description !== "string") {
-    errors.push("description must be a string");
+    errors.push(MSG.CRON_DESC_STRING);
   }
 
   // schedule_type validation
   const scheduleTypeValue = (schedule_type as string) || "cron";
   if (!SCHEDULE_TYPES.includes(scheduleTypeValue as typeof SCHEDULE_TYPES[number])) {
-    errors.push("schedule_type must be one of: cron, every, at");
+    errors.push(MSG.CRON_SCHEDULE_TYPE_INVALID);
   }
 
   // schedule_expr validation
   if (!schedule_expr || typeof schedule_expr !== "string") {
-    errors.push("schedule_expr is required");
+    errors.push(MSG.CRON_SCHEDULE_EXPR_REQUIRED);
   } else if (scheduleTypeValue === "cron" && !CRON_REGEX.test(schedule_expr.trim())) {
-    errors.push("Invalid cron schedule format (use standard cron syntax)");
+    errors.push(MSG.CRON_SCHEDULE_EXPR_INVALID);
   }
 
   // schedule_tz validation (optional)
   if (schedule_tz !== undefined && typeof schedule_tz !== "string") {
-    errors.push("schedule_tz must be a string");
+    errors.push(MSG.CRON_SCHEDULE_TZ_STRING);
   }
 
   // schedule_interval_ms validation (required for "every" type)
   if (scheduleTypeValue === "every") {
     if (schedule_interval_ms === undefined || typeof schedule_interval_ms !== "number") {
-      errors.push("schedule_interval_ms is required for 'every' schedule type");
+      errors.push(MSG.CRON_INTERVAL_REQUIRED);
     } else if (schedule_interval_ms < 1000) {
-      errors.push("schedule_interval_ms must be at least 1000 (1 second)");
+      errors.push(MSG.CRON_INTERVAL_MIN);
     }
   }
 
   // schedule_at_ms validation (required for "at" type)
   if (scheduleTypeValue === "at") {
     if (schedule_at_ms === undefined || typeof schedule_at_ms !== "number") {
-      errors.push("schedule_at_ms is required for 'at' schedule type");
+      errors.push(MSG.CRON_AT_REQUIRED);
     } else if (schedule_at_ms < Date.now()) {
-      errors.push("schedule_at_ms must be in the future");
+      errors.push(MSG.CRON_AT_FUTURE);
     }
   }
 
   // schedule_anchor_ms validation (optional, for "every" type)
   if (schedule_anchor_ms !== undefined && typeof schedule_anchor_ms !== "number") {
-    errors.push("schedule_anchor_ms must be a number");
+    errors.push(MSG.CRON_ANCHOR_NUMBER);
   }
 
   // agent_id validation (optional)
   if (agent_id !== undefined && typeof agent_id !== "string") {
-    errors.push("agent_id must be a string");
+    errors.push(MSG.CRON_AGENT_ID_STRING);
   }
 
   // session_target validation
   if (session_target !== undefined && !SESSION_TARGETS.includes(session_target as typeof SESSION_TARGETS[number])) {
-    errors.push("session_target must be one of: main, isolated");
+    errors.push(MSG.CRON_SESSION_TARGET_INVALID);
   }
 
   // wake_mode validation
   if (wake_mode !== undefined && !WAKE_MODES.includes(wake_mode as typeof WAKE_MODES[number])) {
-    errors.push("wake_mode must be one of: next-heartbeat, now");
+    errors.push(MSG.CRON_WAKE_MODE_INVALID);
   }
 
   // payload_kind validation
   const payloadKindValue = (payload_kind as string) || "agentTurn";
   if (!PAYLOAD_KINDS.includes(payloadKindValue as typeof PAYLOAD_KINDS[number])) {
-    errors.push("payload_kind must be one of: systemEvent, agentTurn");
+    errors.push(MSG.CRON_PAYLOAD_KIND_INVALID);
   }
 
   // session_target ↔ payload_kind constraint (Moltbot requirement)
   const sessionTargetValue = (session_target as string) || "main";
   if (sessionTargetValue === "main" && payloadKindValue !== "systemEvent") {
-    errors.push('session_target="main" requires payload_kind="systemEvent"');
+    errors.push(MSG.CRON_MAIN_REQUIRES_SYSTEM_EVENT);
   }
   if (sessionTargetValue === "isolated" && payloadKindValue !== "agentTurn") {
-    errors.push('session_target="isolated" requires payload_kind="agentTurn"');
+    errors.push(MSG.CRON_ISOLATED_REQUIRES_AGENT_TURN);
   }
 
   // message validation (required - serves as text for systemEvent or message for agentTurn)
   if (!message || typeof message !== "string") {
-    errors.push("message is required");
+    errors.push(MSG.CRON_MESSAGE_REQUIRED);
   } else if (message.trim().length < 1 || message.trim().length > 10000) {
-    errors.push("message must be 1-10000 characters");
+    errors.push(MSG.CRON_MESSAGE_LENGTH);
   }
 
   // model validation (optional)
   if (model !== undefined && typeof model !== "string") {
-    errors.push("model must be a string");
+    errors.push(MSG.CRON_MODEL_STRING);
   }
 
   // thinking validation (optional)
   if (thinking !== undefined && typeof thinking !== "string") {
-    errors.push("thinking must be a string");
+    errors.push(MSG.CRON_THINKING_STRING);
   }
 
   // timeout_seconds validation (optional)
   if (timeout_seconds !== undefined) {
     if (typeof timeout_seconds !== "number") {
-      errors.push("timeout_seconds must be a number");
+      errors.push(MSG.CRON_TIMEOUT_NUMBER);
     } else if (timeout_seconds < 1 || timeout_seconds > 600) {
-      errors.push("timeout_seconds must be 1-600");
+      errors.push(MSG.CRON_TIMEOUT_RANGE);
     }
   }
 
   // deliver validation (optional)
   if (deliver !== undefined && typeof deliver !== "boolean") {
-    errors.push("deliver must be a boolean");
+    errors.push(MSG.CRON_DELIVER_BOOLEAN);
   }
 
   // channel validation (optional)
   if (channel !== undefined && typeof channel !== "string") {
-    errors.push("channel must be a string");
+    errors.push(MSG.CRON_CHANNEL_STRING);
   }
 
   // to_recipient validation (optional)
   if (to_recipient !== undefined && typeof to_recipient !== "string") {
-    errors.push("to_recipient must be a string");
+    errors.push(MSG.CRON_TO_STRING);
   }
 
   // allow_unsafe_external_content validation (optional)
   if (allow_unsafe_external_content !== undefined && typeof allow_unsafe_external_content !== "boolean") {
-    errors.push("allow_unsafe_external_content must be a boolean");
+    errors.push(MSG.CRON_UNSAFE_BOOLEAN);
   }
 
   // best_effort_deliver validation (optional)
   if (best_effort_deliver !== undefined && typeof best_effort_deliver !== "boolean") {
-    errors.push("best_effort_deliver must be a boolean");
+    errors.push(MSG.CRON_BEST_EFFORT_BOOLEAN);
   }
 
   // isolation_post_to_main_prefix validation (optional)
   if (isolation_post_to_main_prefix !== undefined && typeof isolation_post_to_main_prefix !== "string") {
-    errors.push("isolation_post_to_main_prefix must be a string");
+    errors.push(MSG.CRON_POST_PREFIX_STRING);
   }
 
   // isolation_post_to_main_mode validation (optional)
   if (isolation_post_to_main_mode !== undefined && !ISOLATION_POST_MODES.includes(isolation_post_to_main_mode as typeof ISOLATION_POST_MODES[number])) {
-    errors.push("isolation_post_to_main_mode must be one of: summary, full");
+    errors.push(MSG.CRON_POST_MODE_INVALID);
   }
 
   // isolation_post_to_main_max_chars validation (optional)
   if (isolation_post_to_main_max_chars !== undefined) {
     if (typeof isolation_post_to_main_max_chars !== "number") {
-      errors.push("isolation_post_to_main_max_chars must be a number");
+      errors.push(MSG.CRON_POST_MAX_CHARS_NUMBER);
     } else if (isolation_post_to_main_max_chars < 100 || isolation_post_to_main_max_chars > 100000) {
-      errors.push("isolation_post_to_main_max_chars must be 100-100000");
+      errors.push(MSG.CRON_POST_MAX_CHARS_RANGE);
     }
   }
 
   // enabled validation (optional)
   if (enabled !== undefined && typeof enabled !== "boolean") {
-    errors.push("enabled must be a boolean");
+    errors.push(MSG.CRON_ENABLED_BOOLEAN);
   }
 
   // delete_after_run validation (optional)
   if (delete_after_run !== undefined && typeof delete_after_run !== "boolean") {
-    errors.push("delete_after_run must be a boolean");
+    errors.push(MSG.CRON_DELETE_AFTER_RUN_BOOLEAN);
   }
 
   // metadata validation (optional)
   if (metadata !== undefined && (typeof metadata !== "object" || metadata === null)) {
-    errors.push("metadata must be an object");
+    errors.push(MSG.CRON_METADATA_OBJECT);
   }
 
   if (errors.length > 0) {
@@ -355,7 +356,7 @@ export function validateUpdateCronjob(body: unknown): ValidationResult<UpdateCro
   const errors: string[] = [];
 
   if (!body || typeof body !== "object") {
-    return { valid: false, errors: ["Request body required"], data: null };
+    return { valid: false, errors: [MSG.REQUEST_BODY_REQUIRED], data: null };
   }
 
   const {
@@ -390,163 +391,163 @@ export function validateUpdateCronjob(body: unknown): ValidationResult<UpdateCro
 
   // agent_id validation (optional)
   if (agent_id !== undefined && typeof agent_id !== "string") {
-    errors.push("agent_id must be a string");
+    errors.push(MSG.CRON_AGENT_ID_STRING);
   }
 
   // name validation (optional)
   if (name !== undefined) {
     if (typeof name !== "string") {
-      errors.push("name must be a string");
+      errors.push(MSG.CRON_NAME_REQUIRED);
     } else if (name.trim().length < 1 || name.trim().length > 100) {
-      errors.push("name must be 1-100 characters");
+      errors.push(MSG.CRON_NAME_LENGTH);
     }
   }
 
   // description validation (optional)
   if (description !== undefined && typeof description !== "string") {
-    errors.push("description must be a string");
+    errors.push(MSG.CRON_DESC_STRING);
   }
 
   // schedule_type validation (optional)
   if (schedule_type !== undefined && !SCHEDULE_TYPES.includes(schedule_type as typeof SCHEDULE_TYPES[number])) {
-    errors.push("schedule_type must be one of: cron, every, at");
+    errors.push(MSG.CRON_SCHEDULE_TYPE_INVALID);
   }
 
   // schedule_expr validation (optional)
   if (schedule_expr !== undefined) {
     if (typeof schedule_expr !== "string") {
-      errors.push("schedule_expr must be a string");
+      errors.push(MSG.CRON_SCHEDULE_EXPR_REQUIRED);
     } else if (schedule_type === "cron" && !CRON_REGEX.test(schedule_expr.trim())) {
-      errors.push("Invalid cron schedule format");
+      errors.push(MSG.CRON_SCHEDULE_EXPR_INVALID);
     }
   }
 
   // schedule_tz validation (optional)
   if (schedule_tz !== undefined && typeof schedule_tz !== "string") {
-    errors.push("schedule_tz must be a string");
+    errors.push(MSG.CRON_SCHEDULE_TZ_STRING);
   }
 
   // schedule_interval_ms validation (optional)
   if (schedule_interval_ms !== undefined) {
     if (typeof schedule_interval_ms !== "number") {
-      errors.push("schedule_interval_ms must be a number");
+      errors.push(MSG.CRON_ANCHOR_NUMBER);
     } else if (schedule_interval_ms < 1000) {
-      errors.push("schedule_interval_ms must be at least 1000 (1 second)");
+      errors.push(MSG.CRON_INTERVAL_MIN);
     }
   }
 
   // schedule_at_ms validation (optional)
   if (schedule_at_ms !== undefined) {
     if (typeof schedule_at_ms !== "number") {
-      errors.push("schedule_at_ms must be a number");
+      errors.push(MSG.CRON_AT_REQUIRED);
     }
   }
 
   // schedule_anchor_ms validation (optional)
   if (schedule_anchor_ms !== undefined && typeof schedule_anchor_ms !== "number") {
-    errors.push("schedule_anchor_ms must be a number");
+    errors.push(MSG.CRON_ANCHOR_NUMBER);
   }
 
   // session_target validation (optional)
   if (session_target !== undefined && !SESSION_TARGETS.includes(session_target as typeof SESSION_TARGETS[number])) {
-    errors.push("session_target must be one of: main, isolated");
+    errors.push(MSG.CRON_SESSION_TARGET_INVALID);
   }
 
   // wake_mode validation (optional)
   if (wake_mode !== undefined && !WAKE_MODES.includes(wake_mode as typeof WAKE_MODES[number])) {
-    errors.push("wake_mode must be one of: next-heartbeat, now");
+    errors.push(MSG.CRON_WAKE_MODE_INVALID);
   }
 
   // payload_kind validation (optional)
   if (payload_kind !== undefined && !PAYLOAD_KINDS.includes(payload_kind as typeof PAYLOAD_KINDS[number])) {
-    errors.push("payload_kind must be one of: systemEvent, agentTurn");
+    errors.push(MSG.CRON_PAYLOAD_KIND_INVALID);
   }
 
   // message validation (optional)
   if (message !== undefined) {
     if (typeof message !== "string") {
-      errors.push("message must be a string");
+      errors.push(MSG.CRON_MESSAGE_REQUIRED);
     } else if (message.trim().length < 1 || message.trim().length > 10000) {
-      errors.push("message must be 1-10000 characters");
+      errors.push(MSG.CRON_MESSAGE_LENGTH);
     }
   }
 
   // model validation (optional)
   if (model !== undefined && typeof model !== "string") {
-    errors.push("model must be a string");
+    errors.push(MSG.CRON_MODEL_STRING);
   }
 
   // thinking validation (optional)
   if (thinking !== undefined && typeof thinking !== "string") {
-    errors.push("thinking must be a string");
+    errors.push(MSG.CRON_THINKING_STRING);
   }
 
   // timeout_seconds validation (optional)
   if (timeout_seconds !== undefined) {
     if (typeof timeout_seconds !== "number") {
-      errors.push("timeout_seconds must be a number");
+      errors.push(MSG.CRON_TIMEOUT_NUMBER);
     } else if (timeout_seconds < 1 || timeout_seconds > 600) {
-      errors.push("timeout_seconds must be 1-600");
+      errors.push(MSG.CRON_TIMEOUT_RANGE);
     }
   }
 
   // allow_unsafe_external_content validation (optional)
   if (allow_unsafe_external_content !== undefined && typeof allow_unsafe_external_content !== "boolean") {
-    errors.push("allow_unsafe_external_content must be a boolean");
+    errors.push(MSG.CRON_UNSAFE_BOOLEAN);
   }
 
   // deliver validation (optional)
   if (deliver !== undefined && typeof deliver !== "boolean") {
-    errors.push("deliver must be a boolean");
+    errors.push(MSG.CRON_DELIVER_BOOLEAN);
   }
 
   // channel validation (optional)
   if (channel !== undefined && typeof channel !== "string") {
-    errors.push("channel must be a string");
+    errors.push(MSG.CRON_CHANNEL_STRING);
   }
 
   // to_recipient validation (optional)
   if (to_recipient !== undefined && typeof to_recipient !== "string") {
-    errors.push("to_recipient must be a string");
+    errors.push(MSG.CRON_TO_STRING);
   }
 
   // best_effort_deliver validation (optional)
   if (best_effort_deliver !== undefined && typeof best_effort_deliver !== "boolean") {
-    errors.push("best_effort_deliver must be a boolean");
+    errors.push(MSG.CRON_BEST_EFFORT_BOOLEAN);
   }
 
   // isolation_post_to_main_prefix validation (optional)
   if (isolation_post_to_main_prefix !== undefined && typeof isolation_post_to_main_prefix !== "string") {
-    errors.push("isolation_post_to_main_prefix must be a string");
+    errors.push(MSG.CRON_POST_PREFIX_STRING);
   }
 
   // isolation_post_to_main_mode validation (optional)
   if (isolation_post_to_main_mode !== undefined && !ISOLATION_POST_MODES.includes(isolation_post_to_main_mode as typeof ISOLATION_POST_MODES[number])) {
-    errors.push("isolation_post_to_main_mode must be one of: summary, full");
+    errors.push(MSG.CRON_POST_MODE_INVALID);
   }
 
   // isolation_post_to_main_max_chars validation (optional)
   if (isolation_post_to_main_max_chars !== undefined) {
     if (typeof isolation_post_to_main_max_chars !== "number") {
-      errors.push("isolation_post_to_main_max_chars must be a number");
+      errors.push(MSG.CRON_POST_MAX_CHARS_NUMBER);
     } else if (isolation_post_to_main_max_chars < 100 || isolation_post_to_main_max_chars > 100000) {
-      errors.push("isolation_post_to_main_max_chars must be 100-100000");
+      errors.push(MSG.CRON_POST_MAX_CHARS_RANGE);
     }
   }
 
   // enabled validation (optional)
   if (enabled !== undefined && typeof enabled !== "boolean") {
-    errors.push("enabled must be a boolean");
+    errors.push(MSG.CRON_ENABLED_BOOLEAN);
   }
 
   // delete_after_run validation (optional)
   if (delete_after_run !== undefined && typeof delete_after_run !== "boolean") {
-    errors.push("delete_after_run must be a boolean");
+    errors.push(MSG.CRON_DELETE_AFTER_RUN_BOOLEAN);
   }
 
   // metadata validation (optional)
   if (metadata !== undefined && (typeof metadata !== "object" || metadata === null)) {
-    errors.push("metadata must be an object");
+    errors.push(MSG.CRON_METADATA_OBJECT);
   }
 
   if (errors.length > 0) {
@@ -593,13 +594,13 @@ export function validateUpdateCronjob(body: unknown): ValidationResult<UpdateCro
  */
 export function validateToggleCronjob(body: unknown): ValidationResult<ToggleCronjobDTO> {
   if (!body || typeof body !== "object") {
-    return { valid: false, errors: ["Request body required"], data: null };
+    return { valid: false, errors: [MSG.REQUEST_BODY_REQUIRED], data: null };
   }
 
   const { enabled } = body as Record<string, unknown>;
 
   if (typeof enabled !== "boolean") {
-    return { valid: false, errors: ["enabled must be a boolean"], data: null };
+    return { valid: false, errors: [MSG.CRON_ENABLED_BOOLEAN], data: null };
   }
 
   return {
@@ -614,13 +615,13 @@ export function validateToggleCronjob(body: unknown): ValidationResult<ToggleCro
  */
 export function validateSchedule(body: unknown): ValidationResult<ValidateScheduleDTO> {
   if (!body || typeof body !== "object") {
-    return { valid: false, errors: ["Request body required"], data: null };
+    return { valid: false, errors: [MSG.REQUEST_BODY_REQUIRED], data: null };
   }
 
   const { schedule } = body as Record<string, unknown>;
 
   if (!schedule || typeof schedule !== "string") {
-    return { valid: false, errors: ["schedule is required"], data: null };
+    return { valid: false, errors: [MSG.CRON_SCHEDULE_EXPR_REQUIRED], data: null };
   }
 
   return {

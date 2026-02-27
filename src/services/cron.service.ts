@@ -6,9 +6,11 @@
 
 import { CronExpressionParser } from "cron-parser";
 import cronjobsRepo from "../db/models/cronjobs";
-import { usersRepo } from "../db/index";
+import { usersRepo, tokenTransactionsRepo } from "../db/index";
 import { Errors } from "../core/errors/api-error";
+import { MSG } from "../constants/messages";
 import { analyticsService } from "./analytics.service";
+import { tokenService } from "./token.service";
 import type {
   Cronjob,
   CronjobCreate,
@@ -20,9 +22,13 @@ import type {
 const SCHEDULER_INTERVAL_MS = 60_000; // Check every minute
 const EXECUTION_TIMEOUT_MS = 120_000; // 2 minute timeout
 const STOP_TIMEOUT_MS = 10_000; // 10 second timeout for stop command
+const FREE_TOPUP_INTERVAL_MS = 5 * 60 * 60 * 1000; // 5 hours
+const FREE_TOPUP_AMOUNT = 200_000; // tokens per cycle
+const FREE_TOPUP_WINDOW_MS = FREE_TOPUP_INTERVAL_MS; // idempotency window = 5h
 
 // Scheduler state
 let schedulerTimer: NodeJS.Timeout | null = null;
+let freeTopupTimer: NodeJS.Timeout | null = null;
 let isRunning = false;
 
 /**
@@ -314,17 +320,17 @@ async function executeCronjob(cronjob: Cronjob): Promise<CronjobExecution> {
     // Get user's gateway config
     const user = await usersRepo.getUserById(cronjob.customer_id);
     if (!user) {
-      throw new Error("User not found");
+      throw new Error(MSG.USER_NOT_FOUND);
     }
 
     if (!user.gateway_url) {
-      throw new Error("Gateway URL not configured for user");
+      throw new Error(MSG.GATEWAY_NOT_CONFIGURED);
     }
 
     // Use gateway_hooks_token if available, fallback to gateway_token
     const hooksToken = user.gateway_hooks_token || user.gateway_token;
     if (!hooksToken) {
-      throw new Error("Gateway hooks token not configured for user");
+      throw new Error(MSG.GATEWAY_NOT_CONFIGURED);
     }
 
     const sessionKey = `cron:${cronjob.id}`;
@@ -500,6 +506,57 @@ async function runCronjobNow(
 }
 
 // ============================================================================
+// Free Token Topup - Credit active users every 5 hours (idempotent)
+// ============================================================================
+
+/**
+ * Get current topup window ID based on 5h intervals since epoch.
+ * Same window ID = same topup cycle → used for idempotency.
+ */
+function getTopupWindowId(): string {
+  const windowNumber = Math.floor(Date.now() / FREE_TOPUP_WINDOW_MS);
+  return `free-topup:${windowNumber}`;
+}
+
+/**
+ * Credit all active users with FREE_TOPUP_AMOUNT tokens.
+ * Idempotent: uses reference_id = "free-topup:{windowId}" to skip users already credited.
+ */
+async function processFreeTokenTopup(): Promise<void> {
+  const windowId = getTopupWindowId();
+  console.log(`[Cron] Free topup started — window: ${windowId}`);
+
+  try {
+    // Get all active users (no pagination needed — topup is per-user)
+    const { users } = await usersRepo.listUsers({ limit: 10000, status: "active" });
+
+    let credited = 0;
+    let skipped = 0;
+
+    for (const user of users) {
+      try {
+        // Idempotency: skip if already credited for this window
+        const alreadyCredited = await tokenTransactionsRepo.existsByUserAndReference(user.id, windowId);
+        if (alreadyCredited) {
+          skipped++;
+          continue;
+        }
+
+        await tokenService.credit(user.id, FREE_TOPUP_AMOUNT, "Free 5h topup", windowId);
+        credited++;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Unknown error";
+        console.error(`[Cron] Free topup failed for user ${user.email}: ${msg}`);
+      }
+    }
+
+    console.log(`[Cron] Free topup done — credited: ${credited}, skipped: ${skipped}, total: ${users.length}`);
+  } catch (error) {
+    console.error("[Cron] Free topup error:", error);
+  }
+}
+
+// ============================================================================
 // Scheduler - Background process to check and run due cronjobs
 // ============================================================================
 
@@ -539,9 +596,11 @@ function startScheduler(): void {
 
   console.log("[Cron] Starting scheduler...");
   schedulerTimer = setInterval(processDueCronjobs, SCHEDULER_INTERVAL_MS);
+  freeTopupTimer = setInterval(processFreeTokenTopup, FREE_TOPUP_INTERVAL_MS);
 
   // Run immediately on start
   processDueCronjobs();
+  processFreeTokenTopup();
 }
 
 /**
@@ -551,8 +610,12 @@ function stopScheduler(): void {
   if (schedulerTimer) {
     clearInterval(schedulerTimer);
     schedulerTimer = null;
-    console.log("[Cron] Scheduler stopped");
   }
+  if (freeTopupTimer) {
+    clearInterval(freeTopupTimer);
+    freeTopupTimer = null;
+  }
+  console.log("[Cron] Scheduler stopped");
 }
 
 /**

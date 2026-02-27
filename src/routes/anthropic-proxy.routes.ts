@@ -13,6 +13,7 @@ import { settingsRepo } from "../db/models/settings";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { asyncHandler } from "../middleware/error.middleware";
+import { MSG } from "../constants/messages";
 
 // File-based debug logging (PM2 stdout may be buffered)
 const DEBUG_LOG = "/tmp/anthropic-proxy-debug.log";
@@ -105,7 +106,7 @@ router.post(["/v1/messages", "/messages"], asyncHandler(async (req: Request, res
   if (!userId) {
     res.status(401).json({
       type: "error",
-      error: { type: "authentication_error", message: "Invalid API key" },
+      error: { type: "authentication_error", message: MSG.INVALID_API_KEY },
     });
     return;
   }
@@ -118,7 +119,7 @@ router.post(["/v1/messages", "/messages"], asyncHandler(async (req: Request, res
     console.error("[anthropic-proxy] Token error:", err);
     res.status(500).json({
       type: "error",
-      error: { type: "api_error", message: "No Anthropic token available" },
+      error: { type: "api_error", message: MSG.NO_ANTHROPIC_TOKEN },
     });
     return;
   }
@@ -326,7 +327,7 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
   // 1. Auth
   const userId = await authenticateClient(req);
   if (!userId) {
-    res.status(401).json({ error: { message: "Invalid API key", type: "authentication_error" } });
+    res.status(401).json({ error: { message: MSG.INVALID_API_KEY, type: "authentication_error" } });
     return;
   }
 
@@ -335,7 +336,7 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
   try {
     anthropicToken = await getAnthropicToken();
   } catch (err) {
-    res.status(500).json({ error: { message: "No Anthropic token available", type: "api_error" } });
+    res.status(500).json({ error: { message: MSG.NO_ANTHROPIC_TOKEN, type: "api_error" } });
     return;
   }
 

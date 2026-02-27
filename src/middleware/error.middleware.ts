@@ -5,6 +5,7 @@
 
 import type { Request, Response, NextFunction } from "express";
 import { ApiError, ErrorCode } from "../core/errors/api-error";
+import { MSG, LOG } from "../constants/messages";
 
 /**
  * Global error handler - converts all errors to generic responses
@@ -17,9 +18,9 @@ export function errorMiddleware(
   _next: NextFunction,
 ): void {
   // Log detailed error for debugging
-  console.error(`[api] Error [${err.name}]: ${err.message}`);
+  console.error(LOG.ERROR(err.name, err.message));
   if (err instanceof ApiError) {
-    console.error(`  → Code: ${err.code} | Status: ${err.statusCode}`);
+    console.error(LOG.ERROR_CODE(err.code, err.statusCode));
   }
   if (err.stack) {
     console.error(`  → Stack: ${err.stack.split("\n").slice(1, 4).join("\n")}`);
@@ -37,7 +38,7 @@ export function errorMiddleware(
   // Handle validation errors (from validators)
   if (err.name === "ValidationError") {
     res.status(400).json({
-      error: "Invalid request data",
+      error: MSG.INVALID_REQUEST,
       code: ErrorCode.VALIDATION_ERROR,
     });
     return;
@@ -46,7 +47,7 @@ export function errorMiddleware(
   // Handle JWT errors
   if (err.name === "JsonWebTokenError" || err.name === "TokenExpiredError") {
     res.status(401).json({
-      error: "Authentication failed",
+      error: MSG.AUTH_FAILED,
       code: ErrorCode.INVALID_TOKEN,
     });
     return;
@@ -54,7 +55,7 @@ export function errorMiddleware(
 
   // Default: Generic error (never expose internal details)
   res.status(500).json({
-    error: "An unexpected error occurred",
+    error: MSG.INTERNAL_ERROR,
     code: ErrorCode.INTERNAL_ERROR,
   });
 }

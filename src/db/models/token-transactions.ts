@@ -9,6 +9,7 @@ import { AppDataSource } from "../data-source";
 import { TokenTransactionEntity } from "../entities/token-transaction.entity";
 import { UserEntity } from "../entities/user.entity";
 import type { TokenTransaction, TokenTransactionCreate, User } from "./types";
+import { MSG } from "../../constants/messages";
 
 /**
  * Create a new transaction
@@ -171,11 +172,11 @@ export async function debitTokens(
       .getOne();
 
     if (!userRow) {
-      throw new Error("User not found");
+      throw new Error(MSG.USER_NOT_FOUND);
     }
 
     if (userRow.token_balance < amount) {
-      throw new Error("Insufficient token balance");
+      throw new Error(MSG.INSUFFICIENT_BALANCE(userRow.token_balance, amount));
     }
 
     // Update user balance
@@ -297,6 +298,18 @@ export async function listAllTransactions(
   };
 }
 
+/**
+ * Check if a transaction with specific reference_id exists for a user
+ * Used for idempotency (e.g., prevent duplicate free topups)
+ */
+export async function existsByUserAndReference(userId: string, referenceId: string): Promise<boolean> {
+  const repo = AppDataSource.getRepository(TokenTransactionEntity);
+  const count = await repo.count({
+    where: { user_id: userId, reference_id: referenceId },
+  });
+  return count > 0;
+}
+
 export default {
   createTransaction,
   getTransactionById,
@@ -306,4 +319,5 @@ export default {
   creditTokensWithClient,
   debitTokens,
   adjustTokens,
+  existsByUserAndReference,
 };
