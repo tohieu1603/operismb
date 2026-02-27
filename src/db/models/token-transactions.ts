@@ -97,12 +97,12 @@ export async function creditTokens(
 
     const user = await manager.findOneByOrFail(UserEntity, { id: userId });
 
-    // Create transaction record
+    // Create transaction record (balance_after = total of both balances)
     const tx = manager.create(TokenTransactionEntity, {
       user_id: userId,
       type: "credit",
       amount,
-      balance_after: user.token_balance,
+      balance_after: user.token_balance + user.free_token_balance,
       description: description ?? null,
       reference_id: referenceId ?? null,
     });
@@ -175,27 +175,33 @@ export async function debitTokens(
       throw new Error(MSG.USER_NOT_FOUND);
     }
 
-    if (userRow.token_balance < amount) {
-      throw new Error(MSG.INSUFFICIENT_BALANCE(userRow.token_balance, amount));
+    const totalBalance = userRow.free_token_balance + userRow.token_balance;
+    if (totalBalance < amount) {
+      throw new Error(MSG.INSUFFICIENT_BALANCE(totalBalance, amount));
     }
 
-    // Update user balance
+    // Deduct from free_token_balance first, then paid token_balance
+    const freeDeduct = Math.min(userRow.free_token_balance, amount);
+    const paidDeduct = amount - freeDeduct;
+
     await manager
       .createQueryBuilder()
       .update(UserEntity)
-      .set({ token_balance: () => "token_balance - :amount" })
-      .setParameter("amount", amount)
+      .set({
+        free_token_balance: () => `free_token_balance - ${freeDeduct}`,
+        ...(paidDeduct > 0 ? { token_balance: () => `token_balance - ${paidDeduct}` } : {}),
+      })
       .where("id = :id", { id: userId })
       .execute();
 
     const user = await manager.findOneByOrFail(UserEntity, { id: userId });
 
-    // Create transaction record
+    // Create transaction record (balance_after = total of both balances)
     const tx = manager.create(TokenTransactionEntity, {
       user_id: userId,
       type: "debit",
       amount,
-      balance_after: user.token_balance,
+      balance_after: user.token_balance + user.free_token_balance,
       description: description ?? null,
       reference_id: referenceId ?? null,
     });

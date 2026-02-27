@@ -11,14 +11,15 @@ import { Router, type Request, type Response } from "express";
 import { apiKeyService } from "../services/api-key.service";
 import { settingsRepo } from "../db/models/settings";
 import crypto from "node:crypto";
-import fs from "node:fs";
+
 import { asyncHandler } from "../middleware/error.middleware";
 import { MSG } from "../constants/messages";
 
-// File-based debug logging (PM2 stdout may be buffered)
-const DEBUG_LOG = "/tmp/anthropic-proxy-debug.log";
+// Debug logging (console only — no file writes in production)
 function debugLog(msg: string) {
-  fs.appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] ${msg}\n`);
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[anthropic-proxy] ${msg}`);
+  }
 }
 
 const router = Router();

@@ -33,12 +33,17 @@ export function allowHostsMiddleware(req: Request, res: Response, next: NextFunc
     return;
   }
 
-  // Check if host/origin is in allowed list
+  // Check if host/origin is in allowed list (exact match or suffix match to prevent bypass)
+  const hostLower = host.toLowerCase().split(":")[0]; // strip port
+  let originHost = "";
+  try { if (origin) originHost = new URL(origin).hostname.toLowerCase(); } catch { /* invalid origin */ }
   const isAllowed = ALLOWED_HOSTS.some((allowed) => {
     return (
-      host.toLowerCase().includes(allowed) ||
-      origin.toLowerCase().includes(allowed) ||
-      clientIp.includes(allowed)
+      hostLower === allowed ||
+      hostLower.endsWith(`.${allowed}`) ||
+      originHost === allowed ||
+      originHost.endsWith(`.${allowed}`) ||
+      clientIp === allowed
     );
   });
 

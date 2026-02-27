@@ -155,6 +155,15 @@ export const MSG = {
   INVALID_CATEGORY: (category: string, valid: string) =>
     `Danh mục '${category}' không hợp lệ. Phải là: ${valid}`,
 
+  // ── Validation: feedback ─────────────────────────────────────────────────
+  REPORT_CREATED: "Đã gửi báo cáo thành công",
+  REPORT_NOT_FOUND: "Không tìm thấy báo cáo",
+  REPORT_UPDATED: "Đã cập nhật trạng thái báo cáo",
+  REPORT_SUBJECT_REQUIRED: "Tiêu đề báo cáo là bắt buộc",
+  REPORT_CONTENT_REQUIRED: "Nội dung báo cáo là bắt buộc",
+  REPORT_TYPE_INVALID: "Loại báo cáo phải là: bug, feedback, hoặc suggestion",
+  REPORT_STATUS_INVALID: "Trạng thái phải là: open, in_progress, resolved, hoặc closed",
+
   // ── Validation: review / question ────────────────────────────────────────
   RATING_RANGE: "Đánh giá phải từ 1 đến 5",
   QUESTION_CONTENT_REQUIRED: "Nội dung câu hỏi là bắt buộc",

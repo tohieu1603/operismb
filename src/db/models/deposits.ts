@@ -33,7 +33,7 @@ export interface DepositOrderCreate {
   expires_at: Date;
 }
 
-// Pricing: 1M tokens = 200,000 VND (matches Gói Thuê Bao rate)
+// Pricing: 1M tokens = 200,000 VND (5 tokens per 1 VND)
 export const TOKEN_PRICE_VND = 200000; // VND per 1M tokens
 export const TOKENS_PER_UNIT = 1000000; // 1M tokens
 

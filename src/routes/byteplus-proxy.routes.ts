@@ -119,9 +119,10 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
     });
     return;
   }
-  if (user.token_balance <= 0) {
+  const totalBalance = user.token_balance + user.free_token_balance;
+  if (totalBalance <= 0) {
     res.status(402).json({
-      error: { message: "Insufficient token balance", type: "billing_error", balance: user.token_balance },
+      error: { message: "Insufficient token balance", type: "billing_error", balance: totalBalance },
     });
     return;
   }

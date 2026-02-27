@@ -404,7 +404,7 @@ async function streamMessage(
         output: outputCost,
         total: totalCost,
       },
-      tokenBalance: updatedUser?.token_balance ?? 0,
+      tokenBalance: (updatedUser?.token_balance ?? 0) + (updatedUser?.free_token_balance ?? 0),
     });
 
   } catch (error) {

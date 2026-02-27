@@ -70,6 +70,7 @@ export async function updateUser(id: string, data: UserUpdate): Promise<User | n
   if (data.is_active !== undefined) updateData.is_active = data.is_active;
   if (data.last_active_at !== undefined) updateData.last_active_at = data.last_active_at;
   if (data.token_balance !== undefined) updateData.token_balance = data.token_balance;
+  if (data.free_token_balance !== undefined) updateData.free_token_balance = data.free_token_balance;
   if (data.gateway_url !== undefined) updateData.gateway_url = data.gateway_url;
   if (data.gateway_token !== undefined) updateData.gateway_token = data.gateway_token;
   if (data.gateway_hooks_token !== undefined) updateData.gateway_hooks_token = data.gateway_hooks_token;
@@ -158,7 +159,7 @@ export async function updateTokenBalance(id: string, amount: number): Promise<Us
  */
 export async function hasEnoughTokens(id: string, amount: number): Promise<boolean> {
   const user = await getRepo().findOneBy({ id });
-  return user ? user.token_balance >= amount : false;
+  return user ? (user.token_balance + user.free_token_balance) >= amount : false;
 }
 
 export default {

@@ -196,7 +196,7 @@ class ZaloService {
         `Zalo chat: ${data.model ?? "unknown"} (${data.inputTokens}in/${data.outputTokens}out)`,
         usage.id,
       );
-      balanceAfter = result.user.token_balance;
+      balanceAfter = result.user.token_balance + result.user.free_token_balance;
     } catch (err) {
       console.warn(`[zalo] Failed to debit tokens for user ${data.userId}: ${err}`);
     }
@@ -209,8 +209,8 @@ class ZaloService {
     const user = await getUserById(userId);
     if (!user) return { hasBalance: false, balance: 0, userId };
     return {
-      hasBalance: requiredTokens > 0 ? user.token_balance >= requiredTokens : user.token_balance > 0,
-      balance: user.token_balance,
+      hasBalance: requiredTokens > 0 ? (user.token_balance + user.free_token_balance) >= requiredTokens : (user.token_balance + user.free_token_balance) > 0,
+      balance: user.token_balance + user.free_token_balance,
       userId,
     };
   }

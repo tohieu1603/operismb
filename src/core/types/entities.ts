@@ -17,8 +17,8 @@ export type OperisUser = User;
 // Alias for Operis API Key (with key_hash)
 export type OperisApiKey = UserApiKey;
 
-// Safe User (without password_hash)
-export type SafeUser = Omit<User, "password_hash">;
+// Safe User (without sensitive fields)
+export type SafeUser = Omit<User, "password_hash" | "gateway_token" | "gateway_hooks_token" | "auth_profiles_path">;
 
 // Safe API Key (without key_hash)
 export type SafeApiKey = Omit<UserApiKey, "key_hash">;

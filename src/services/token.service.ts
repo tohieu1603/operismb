@@ -26,7 +26,7 @@ class TokenService {
   async getBalance(userId: string): Promise<number> {
     const user = await usersRepo.getUserById(userId);
     if (!user) throw Errors.notFound("User");
-    return user.token_balance;
+    return user.token_balance + user.free_token_balance;
   }
 
   async getTransactions(
@@ -73,8 +73,9 @@ class TokenService {
   ): Promise<TransactionResult> {
     const user = await usersRepo.getUserById(userId);
     if (!user) throw Errors.notFound("User");
-    if (user.token_balance < amount) {
-      throw Errors.insufficientBalance(user.token_balance, amount);
+    const totalBalance = user.token_balance + user.free_token_balance;
+    if (totalBalance < amount) {
+      throw Errors.insufficientBalance(totalBalance, amount);
     }
 
     const result = await tokenTransactionsRepo.debitTokens(
@@ -118,8 +119,9 @@ class TokenService {
 
     const user = await usersRepo.getUserById(userId);
     if (!user) throw Errors.notFound("User");
-    if (user.token_balance < costTokens) {
-      throw Errors.insufficientBalance(user.token_balance, costTokens);
+    const totalBalance = user.token_balance + user.free_token_balance;
+    if (totalBalance < costTokens) {
+      throw Errors.insufficientBalance(totalBalance, costTokens);
     }
 
     // 1) Record usage analytics
