@@ -4,7 +4,7 @@
 
 import type { Request, Response, NextFunction } from "express";
 import { depositService } from "../services/deposit.service";
-import type { DepositType } from "../db/models/deposits";
+import { type DepositType, calculateTokensFromVnd } from "../db/models/deposits";
 import { MSG } from "../constants/messages";
 
 /**
@@ -45,7 +45,6 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
         packagePriceVnd = pkg.priceVnd;
       } else if (!tokenAmount && amountVnd) {
         // Convert VND to tokens using base rate, keep original VND for QR
-        const { calculateTokensFromVnd } = await import("../db/models/deposits");
         tokenAmount = calculateTokensFromVnd(amountVnd);
         explicitAmountVnd = amountVnd;
       }
