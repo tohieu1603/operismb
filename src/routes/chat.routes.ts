@@ -266,6 +266,13 @@ router.post(
   asyncHandler((req, res) => chatStreamController.streamMessage(req, res)),
 );
 
+// Save messages + billing after gateway WS chat completion
+router.post(
+  "/ws-complete",
+  authMiddleware,
+  asyncHandler((req, res) => chatController.wsComplete(req, res)),
+);
+
 // =============================================================================
 // PROTECTED ROUTES - Chỉ JWT authentication
 // =============================================================================

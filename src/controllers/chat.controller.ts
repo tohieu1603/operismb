@@ -5,7 +5,9 @@
 
 import type { Request, Response } from "express";
 import { chatService } from "../services/chat.service";
-import { chatMessagesRepo } from "../db/index";
+import { chatMessagesRepo, usersRepo } from "../db/index";
+import { tokenService } from "../services/token.service";
+import { analyticsService } from "../services/analytics.service";
 import { Errors } from "../core/errors/api-error";
 import { escapeHtml } from "../utils/sanitize.util";
 
@@ -64,6 +66,60 @@ class ChatController {
   async newConversation(req: Request, res: Response): Promise<void> {
     const result = await chatService.newConversation(req.user!.userId);
     res.json(result);
+  }
+
+  /**
+   * Save messages + record billing after a gateway WS chat completion.
+   * Called by client-web after receiving chat:final from gateway.
+   */
+  async wsComplete(req: Request, res: Response): Promise<void> {
+    const { conversationId, userMessage, assistantMessage, usage } = req.body;
+    if (!conversationId || !userMessage || !assistantMessage) {
+      throw Errors.validation("conversationId, userMessage, assistantMessage required");
+    }
+
+    const userId = req.user!.userId;
+    const inputTokens = Number(usage?.input_tokens) || 0;
+    const outputTokens = Number(usage?.output_tokens) || 0;
+    const totalTokens = Number(usage?.total_tokens) || inputTokens + outputTokens;
+
+    // Save user message
+    await chatMessagesRepo.createMessage({
+      user_id: userId,
+      conversation_id: conversationId,
+      role: "user",
+      content: escapeHtml(userMessage),
+    });
+
+    // Save assistant message
+    await chatMessagesRepo.createMessage({
+      user_id: userId,
+      conversation_id: conversationId,
+      role: "assistant",
+      content: assistantMessage,
+      tokens_used: totalTokens,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+    });
+
+    // Deduct tokens + record analytics
+    if (totalTokens > 0) {
+      await tokenService.debit(userId, totalTokens, `Chat WS: ${userMessage.slice(0, 30)}...`);
+      await analyticsService.recordUsage({
+        user_id: userId,
+        request_type: "chat",
+        request_id: conversationId,
+        model: "gateway-agent",
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        total_tokens: totalTokens,
+        cost_tokens: totalTokens,
+        metadata: { message_preview: userMessage.slice(0, 50), ws: true },
+      });
+    }
+
+    const updatedUser = await usersRepo.getUserById(userId);
+    res.json({ success: true, tokenBalance: updatedUser?.token_balance ?? 0 });
   }
 
   /**
