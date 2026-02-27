@@ -30,9 +30,11 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
 
     if (type === "token") {
       let packagePriceVnd: number | undefined;
+      let explicitAmountVnd: number | undefined;
 
-      // Resolve tierId to tokenAmount + package price if provided
+      // Priority: tierId > tokenAmount > amountVnd
       if (!tokenAmount && tierId) {
+        // Resolve tierId to tokenAmount + package price
         const pricing = await depositService.getPricingInfo();
         const pkg = pricing.packages.find((p) => p.id === tierId);
         if (!pkg) {
@@ -40,7 +42,12 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
           return;
         }
         tokenAmount = pkg.tokens;
-        packagePriceVnd = pkg.priceVnd; // Use package price, not per-token rate
+        packagePriceVnd = pkg.priceVnd;
+      } else if (!tokenAmount && amountVnd) {
+        // Convert VND to tokens using base rate, keep original VND for QR
+        const { calculateTokensFromVnd } = await import("../db/models/deposits");
+        tokenAmount = calculateTokensFromVnd(amountVnd);
+        explicitAmountVnd = amountVnd;
       }
 
       if (!tokenAmount) {
@@ -51,7 +58,7 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
       const order = await depositService.createDeposit(userId, {
         type: "token",
         tokenAmount,
-        amountVnd: packagePriceVnd, // Override calculated price with package price
+        amountVnd: packagePriceVnd ?? explicitAmountVnd,
       });
       res.status(201).json(order);
     } else if (type === "order") {
