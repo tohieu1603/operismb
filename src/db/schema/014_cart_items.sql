@@ -1,7 +1,7 @@
 -- Cart items: stores user cart with product_slug + quantity
 CREATE TABLE IF NOT EXISTS cart_items (
   id          SERIAL PRIMARY KEY,
-  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   product_slug VARCHAR(255) NOT NULL,
   quantity    INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
   updated_at  TIMESTAMP DEFAULT NOW(),
