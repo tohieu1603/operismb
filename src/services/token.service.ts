@@ -8,6 +8,7 @@ import { sanitizeUser } from "../utils/sanitize.util";
 import type { SafeUser, TokenTransaction } from "../core/types/entities";
 import { MSG } from "../constants/messages";
 import type { RequestType } from "../db/models/types";
+import { cronService } from "./cron.service";
 
 export interface TransactionResult {
   user: SafeUser;
@@ -23,10 +24,20 @@ export interface PaginatedTransactions {
 }
 
 class TokenService {
-  async getBalance(userId: string): Promise<number> {
+  async getBalance(userId: string): Promise<{
+    balance: number;
+    paid: number;
+    free: number;
+    next_free_reset_at: number;
+  }> {
     const user = await usersRepo.getUserById(userId);
     if (!user) throw Errors.notFound("User");
-    return user.token_balance;
+    return {
+      balance: user.token_balance + user.free_token_balance,
+      paid: user.token_balance,
+      free: user.free_token_balance,
+      next_free_reset_at: cronService.getNextFreeResetAt(),
+    };
   }
 
   async getTransactions(
@@ -73,8 +84,9 @@ class TokenService {
   ): Promise<TransactionResult> {
     const user = await usersRepo.getUserById(userId);
     if (!user) throw Errors.notFound("User");
-    if (user.token_balance < amount) {
-      throw Errors.insufficientBalance(user.token_balance, amount);
+    const totalBalance = user.token_balance + user.free_token_balance;
+    if (totalBalance < amount) {
+      throw Errors.insufficientBalance(totalBalance, amount);
     }
 
     const result = await tokenTransactionsRepo.debitTokens(
@@ -118,8 +130,9 @@ class TokenService {
 
     const user = await usersRepo.getUserById(userId);
     if (!user) throw Errors.notFound("User");
-    if (user.token_balance < costTokens) {
-      throw Errors.insufficientBalance(user.token_balance, costTokens);
+    const totalBalance = user.token_balance + user.free_token_balance;
+    if (totalBalance < costTokens) {
+      throw Errors.insufficientBalance(totalBalance, costTokens);
     }
 
     // 1) Record usage analytics

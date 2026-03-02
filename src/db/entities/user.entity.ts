@@ -32,6 +32,9 @@ export class UserEntity {
   @Column({ type: 'integer', nullable: false, default: 100 })
   token_balance!: number;
 
+  @Column({ type: 'integer', nullable: false, default: 200000 })
+  free_token_balance!: number;
+
   @Column({ type: 'text', nullable: true })
   unique_machine!: string | null;
 

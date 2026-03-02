@@ -13,14 +13,17 @@ export const REFRESH_COOKIE = "operis_refresh";
 const ACCESS_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 const REFRESH_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-const isProduction = process.env.NODE_ENV === "production";
+// Secure cookies when production OR explicitly enabled (for HTTPS behind reverse proxy)
+const useSecureCookies =
+  process.env.NODE_ENV === "production" ||
+  process.env.COOKIE_SECURE === "true";
 
 function baseCookieOptions(): CookieOptions {
   return {
     httpOnly: true,
-    secure: isProduction,
-    // "none" + secure for cross-origin prod; "lax" for same-origin dev
-    sameSite: isProduction ? "none" : "lax",
+    secure: useSecureCookies,
+    // "none" + secure for cross-origin; "lax" for same-origin dev
+    sameSite: useSecureCookies ? "none" : "lax",
   };
 }
 

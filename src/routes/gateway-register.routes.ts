@@ -8,7 +8,10 @@ import { asyncHandler } from "../middleware/index";
 import { updateUser, getUserByEmail } from "../db/models/users";
 import { MSG } from "../constants/messages";
 
-const REGISTER_SECRET = process.env.GATEWAY_REGISTER_SECRET || "operis-gateway-register-secret";
+const REGISTER_SECRET = process.env.GATEWAY_REGISTER_SECRET;
+if (!REGISTER_SECRET) {
+  console.error("[FATAL] GATEWAY_REGISTER_SECRET env var is not set — gateway register route disabled");
+}
 
 const router = Router();
 
@@ -21,9 +24,9 @@ const router = Router();
 router.put(
   "/register",
   asyncHandler(async (req, res) => {
-    // Verify shared secret
+    // Verify shared secret (reject all if not configured)
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ") || authHeader.slice(7) !== REGISTER_SECRET) {
+    if (!REGISTER_SECRET || !authHeader?.startsWith("Bearer ") || authHeader.slice(7) !== REGISTER_SECRET) {
       res.status(401).json({ error: MSG.INVALID_REGISTER_SECRET });
       return;
     }

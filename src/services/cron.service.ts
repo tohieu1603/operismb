@@ -10,7 +10,6 @@ import { usersRepo, tokenTransactionsRepo } from "../db/index";
 import { Errors } from "../core/errors/api-error";
 import { MSG } from "../constants/messages";
 import { analyticsService } from "./analytics.service";
-import { tokenService } from "./token.service";
 import type {
   Cronjob,
   CronjobCreate,
@@ -22,9 +21,9 @@ import type {
 const SCHEDULER_INTERVAL_MS = 60_000; // Check every minute
 const EXECUTION_TIMEOUT_MS = 120_000; // 2 minute timeout
 const STOP_TIMEOUT_MS = 10_000; // 10 second timeout for stop command
-const FREE_TOPUP_INTERVAL_MS = 5 * 60 * 60 * 1000; // 5 hours
-const FREE_TOPUP_AMOUNT = 200_000; // tokens per cycle
-const FREE_TOPUP_WINDOW_MS = FREE_TOPUP_INTERVAL_MS; // idempotency window = 5h
+const FREE_TOPUP_INTERVAL_MS = (Number(process.env.FREE_TOPUP_INTERVAL_HOURS) || 5) * 60 * 60 * 1000;
+const FREE_TOPUP_AMOUNT = Number(process.env.FREE_TOPUP_AMOUNT) || 200_000;
+const FREE_TOPUP_WINDOW_MS = FREE_TOPUP_INTERVAL_MS;
 
 // Scheduler state
 let schedulerTimer: NodeJS.Timeout | null = null;
@@ -519,38 +518,49 @@ function getTopupWindowId(): string {
 }
 
 /**
- * Credit all active users with FREE_TOPUP_AMOUNT tokens.
- * Idempotent: uses reference_id = "free-topup:{windowId}" to skip users already credited.
+ * Reset free_token_balance to FREE_TOPUP_AMOUNT for all active users.
+ * Does NOT touch paid token_balance. Idempotent via window-based reference_id.
  */
 async function processFreeTokenTopup(): Promise<void> {
   const windowId = getTopupWindowId();
   console.log(`[Cron] Free topup started — window: ${windowId}`);
 
   try {
-    // Get all active users (no pagination needed — topup is per-user)
     const { users } = await usersRepo.listUsers({ limit: 10000, status: "active" });
 
-    let credited = 0;
+    let reset = 0;
     let skipped = 0;
 
     for (const user of users) {
       try {
-        // Idempotency: skip if already credited for this window
-        const alreadyCredited = await tokenTransactionsRepo.existsByUserAndReference(user.id, windowId);
-        if (alreadyCredited) {
+        // Idempotency: skip if already reset for this window
+        const alreadyDone = await tokenTransactionsRepo.existsByUserAndReference(user.id, windowId);
+        if (alreadyDone) {
           skipped++;
           continue;
         }
 
-        await tokenService.credit(user.id, FREE_TOPUP_AMOUNT, "Free 5h topup", windowId);
-        credited++;
+        // Reset free_token_balance to FREE_TOPUP_AMOUNT (not accumulate)
+        await usersRepo.updateUser(user.id, { free_token_balance: FREE_TOPUP_AMOUNT });
+
+        // Record transaction for audit trail (amount = how many tokens were given)
+        await tokenTransactionsRepo.createTransaction({
+          user_id: user.id,
+          type: "credit",
+          amount: FREE_TOPUP_AMOUNT,
+          balance_after: user.token_balance + FREE_TOPUP_AMOUNT,
+          description: "Free 5h topup (reset)",
+          reference_id: windowId,
+        });
+
+        reset++;
       } catch (error) {
         const msg = error instanceof Error ? error.message : "Unknown error";
         console.error(`[Cron] Free topup failed for user ${user.email}: ${msg}`);
       }
     }
 
-    console.log(`[Cron] Free topup done — credited: ${credited}, skipped: ${skipped}, total: ${users.length}`);
+    console.log(`[Cron] Free topup done — reset: ${reset}, skipped: ${skipped}, total: ${users.length}`);
   } catch (error) {
     console.error("[Cron] Free topup error:", error);
   }
@@ -628,6 +638,15 @@ function getSchedulerStatus(): { running: boolean; interval: number } {
   };
 }
 
+/**
+ * Get the next free token reset timestamp (ms since epoch).
+ * Based on the same window calculation used by processFreeTokenTopup.
+ */
+function getNextFreeResetAt(): number {
+  const currentWindow = Math.floor(Date.now() / FREE_TOPUP_WINDOW_MS);
+  return (currentWindow + 1) * FREE_TOPUP_WINDOW_MS;
+}
+
 export const cronService = {
   // CRUD
   createCronjob,
@@ -646,6 +665,8 @@ export const cronService = {
   startScheduler,
   stopScheduler,
   getSchedulerStatus,
+  // Free topup
+  getNextFreeResetAt,
   // Utilities
   isValidCronSchedule,
   calculateNextRun,

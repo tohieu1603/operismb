@@ -159,11 +159,12 @@ export async function reportUsage(req: Request, res: Response, next: NextFunctio
       return;
     }
 
-    const inputTokens = parseInt(input_tokens) || 0;
-    const outputTokens = parseInt(output_tokens) || 0;
-    const cacheRead = parseInt(cache_read_tokens) || 0;
-    const cacheWrite = parseInt(cache_write_tokens) || 0;
-    const totalTokens = inputTokens + outputTokens + cacheRead + cacheWrite;
+    const MAX_TOKENS = 1_000_000; // Cap to prevent billing abuse
+    const inputTokens = Math.min(Math.max(parseInt(input_tokens) || 0, 0), MAX_TOKENS);
+    const outputTokens = Math.min(Math.max(parseInt(output_tokens) || 0, 0), MAX_TOKENS);
+    const cacheRead = Math.min(Math.max(parseInt(cache_read_tokens) || 0, 0), MAX_TOKENS);
+    const cacheWrite = Math.min(Math.max(parseInt(cache_write_tokens) || 0, 0), MAX_TOKENS);
+    const totalTokens = Math.min(inputTokens + outputTokens + cacheRead + cacheWrite, MAX_TOKENS);
 
     if (totalTokens <= 0) {
       res.json({ success: true, deducted: 0, balance: 0 });

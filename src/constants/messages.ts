@@ -151,9 +151,23 @@ export const MSG = {
   INVALID_STATUS: (validStatuses: string) =>
     `Trạng thái không hợp lệ. Phải là: ${validStatuses}`,
 
+  // ── Validation: cart ────────────────────────────────────────────────────
+  CART_ITEMS_REQUIRED: "Danh sách sản phẩm là bắt buộc",
+  CART_INVALID_ITEM: "Mỗi item phải có product_slug (string) và quantity (số dương)",
+  CART_PRODUCT_NOT_FOUND: (slug: string) => `Sản phẩm '${slug}' không tồn tại`,
+
   // ── Validation: product ──────────────────────────────────────────────────
   INVALID_CATEGORY: (category: string, valid: string) =>
     `Danh mục '${category}' không hợp lệ. Phải là: ${valid}`,
+
+  // ── Validation: feedback ─────────────────────────────────────────────────
+  REPORT_CREATED: "Đã gửi báo cáo thành công",
+  REPORT_NOT_FOUND: "Không tìm thấy báo cáo",
+  REPORT_UPDATED: "Đã cập nhật trạng thái báo cáo",
+  REPORT_SUBJECT_REQUIRED: "Tiêu đề báo cáo là bắt buộc",
+  REPORT_CONTENT_REQUIRED: "Nội dung báo cáo là bắt buộc",
+  REPORT_TYPE_INVALID: "Loại báo cáo phải là: bug, feedback, hoặc suggestion",
+  REPORT_STATUS_INVALID: "Trạng thái phải là: open, in_progress, resolved, hoặc closed",
 
   // ── Validation: review / question ────────────────────────────────────────
   RATING_RANGE: "Đánh giá phải từ 1 đến 5",

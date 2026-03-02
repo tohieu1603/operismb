@@ -7,6 +7,7 @@ import "dotenv/config";
 import cluster from "node:cluster";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import swaggerUi from "swagger-ui-express";
 import { operisRouter } from "./index";
@@ -19,6 +20,7 @@ import anthropicProxyRoutes from "./routes/anthropic-proxy.routes";
 import byteplusProxyRoutes from "./routes/byteplus-proxy.routes";
 import { cronService } from "./services/cron.service";
 import { swaggerSpec } from "./config/swagger.config";
+import { apiLimiter } from "./middleware/rate-limit.middleware";
 
 const PORT = parseInt(process.env.PORT || "3025", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -41,22 +43,23 @@ async function main() {
 
   const app = express();
 
-  // Trust 1 proxy layer (Nginx) so Express reads real client IP from X-Forwarded-For
-  // Without this: req.ip = 127.0.0.1 (Nginx IP) → rate-limit counts all users as one
-  // With this:    req.ip = real client IP → rate-limit, logging, allow-hosts work correctly
-  app.set("trust proxy", 2);
+  // Trust 1 proxy layer (Nginx) for correct client IP in rate-limit/logging
+  app.set("trust proxy", 1);
 
-  // CORS
+  // Security headers
+  app.use(helmet({ contentSecurityPolicy: false }));
+
+  // CORS — exact match on allowed origins (no prefix/substring bypass)
   app.use(
     cors({
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
         const isAllowed = ALLOWED_ORIGINS.some((allowed) => {
           if (allowed.includes("*")) {
-            const pattern = allowed.replace("*", "\\d+");
+            const pattern = `^${allowed.replace("*", "\\d+")}$`;
             return new RegExp(pattern).test(origin);
           }
-          return origin.startsWith(allowed);
+          return origin === allowed;
         });
         if (isAllowed) {
           callback(null, true);
@@ -71,6 +74,10 @@ async function main() {
   app.use(express.json({ limit: "50mb" }));
   app.use(cookieParser());
   app.use(allowHostsMiddleware);
+
+  // Global rate limit: 200 req/min per IP on all API routes
+  app.use("/api", apiLimiter);
+  app.use("/v1", apiLimiter);
 
   // Debug: log all incoming requests
   app.use((req, _res, next) => {

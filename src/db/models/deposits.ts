@@ -33,7 +33,7 @@ export interface DepositOrderCreate {
   expires_at: Date;
 }
 
-// Pricing: 1M tokens = 200,000 VND (matches Gói Thuê Bao rate)
+// Pricing: 1M tokens = 200,000 VND (5 tokens per 1 VND)
 export const TOKEN_PRICE_VND = 200000; // VND per 1M tokens
 export const TOKENS_PER_UNIT = 1000000; // 1M tokens
 
@@ -223,13 +223,10 @@ export async function listAllDeposits(
     countQb.andWhere("d.user_id = :userId", { userId: options.userId });
   }
 
-  const total = await countQb.getCount();
-
-  const rawResults = await qb
-    .orderBy("d.created_at", "DESC")
-    .limit(limit)
-    .offset(offset)
-    .getRawMany();
+  const [total, rawResults] = await Promise.all([
+    countQb.getCount(),
+    qb.orderBy("d.created_at", "DESC").limit(limit).offset(offset).getRawMany(),
+  ]);
 
   const deposits = rawResults.map((row) => ({
     id: row.d_id,

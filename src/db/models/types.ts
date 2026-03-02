@@ -383,6 +383,7 @@ export interface User {
   is_active: boolean;
   last_active_at: Date | null;
   token_balance: number;
+  free_token_balance: number;
   unique_machine: string | null; // Unique machine/device identifier
   // Custom Moltbot gateway for AI calls
   gateway_url: string | null;
@@ -423,6 +424,7 @@ export interface UserUpdate {
   is_active?: boolean;
   last_active_at?: Date;
   token_balance?: number;
+  free_token_balance?: number;
   unique_machine?: string | null;
   gateway_url?: string | null;
   gateway_token?: string | null;

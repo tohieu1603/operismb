@@ -134,7 +134,7 @@ export async function clearAuthProfiles(userAuthProfilesPath?: string | null): P
 // ============================================
 
 const GATEWAY_PUSH_TIMEOUT_MS = 10_000;
-const REGISTER_SECRET = process.env.GATEWAY_REGISTER_SECRET || "operis-gateway-register-secret";
+const REGISTER_SECRET = process.env.GATEWAY_REGISTER_SECRET || "";
 // operis-api public URL for gateway callback (gateway → operis-api PUT /gateway/register)
 function getOperisApiUrl(): string {
   const raw = process.env.OPERIS_API_URL || "http://127.0.0.1:3025";

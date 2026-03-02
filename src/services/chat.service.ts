@@ -168,8 +168,9 @@ class ChatService {
 
     // Deduct tokens
     const tokensToDeduct = aiResponse.usage.total_tokens;
-    if (tokensToDeduct > 0 && user.token_balance < tokensToDeduct) {
-      throw Errors.insufficientBalance(user.token_balance, tokensToDeduct);
+    const totalBalance = user.token_balance + user.free_token_balance;
+    if (tokensToDeduct > 0 && totalBalance < tokensToDeduct) {
+      throw Errors.insufficientBalance(totalBalance, tokensToDeduct);
     }
 
     if (tokensToDeduct > 0) {
@@ -196,7 +197,7 @@ class ChatService {
     return {
       ...aiResponse,
       conversationId: convId,
-      tokenBalance: updatedUser?.token_balance ?? 0,
+      tokenBalance: (updatedUser?.token_balance ?? 0) + (updatedUser?.free_token_balance ?? 0),
     };
   }
 
@@ -402,9 +403,8 @@ class ChatService {
     }));
   }
 
-  async getBalance(userId: string): Promise<{ balance: number }> {
-    const balance = await tokenService.getBalance(userId);
-    return { balance };
+  async getBalance(userId: string) {
+    return tokenService.getBalance(userId);
   }
 
   async getConversations(userId: string): Promise<any[]> {

@@ -9,8 +9,8 @@ import { MSG } from "../constants/messages";
 
 class TokenController {
   async getBalance(req: Request, res: Response): Promise<void> {
-    const balance = await tokenService.getBalance(req.user!.userId);
-    res.json({ balance });
+    const result = await tokenService.getBalance(req.user!.userId);
+    res.json(result);
   }
 
   async getTransactions(req: Request, res: Response): Promise<void> {

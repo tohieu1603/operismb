@@ -97,12 +97,12 @@ export async function creditTokens(
 
     const user = await manager.findOneByOrFail(UserEntity, { id: userId });
 
-    // Create transaction record
+    // Create transaction record (balance_after = total of both balances)
     const tx = manager.create(TokenTransactionEntity, {
       user_id: userId,
       type: "credit",
       amount,
-      balance_after: user.token_balance,
+      balance_after: user.token_balance + user.free_token_balance,
       description: description ?? null,
       reference_id: referenceId ?? null,
     });
@@ -175,27 +175,33 @@ export async function debitTokens(
       throw new Error(MSG.USER_NOT_FOUND);
     }
 
-    if (userRow.token_balance < amount) {
-      throw new Error(MSG.INSUFFICIENT_BALANCE(userRow.token_balance, amount));
+    const totalBalance = userRow.free_token_balance + userRow.token_balance;
+    if (totalBalance < amount) {
+      throw new Error(MSG.INSUFFICIENT_BALANCE(totalBalance, amount));
     }
 
-    // Update user balance
+    // Deduct from free_token_balance first, then paid token_balance
+    const freeDeduct = Math.min(userRow.free_token_balance, amount);
+    const paidDeduct = amount - freeDeduct;
+
     await manager
       .createQueryBuilder()
       .update(UserEntity)
-      .set({ token_balance: () => "token_balance - :amount" })
-      .setParameter("amount", amount)
+      .set({
+        free_token_balance: () => `free_token_balance - ${freeDeduct}`,
+        ...(paidDeduct > 0 ? { token_balance: () => `token_balance - ${paidDeduct}` } : {}),
+      })
       .where("id = :id", { id: userId })
       .execute();
 
     const user = await manager.findOneByOrFail(UserEntity, { id: userId });
 
-    // Create transaction record
+    // Create transaction record (balance_after = total of both balances)
     const tx = manager.create(TokenTransactionEntity, {
       user_id: userId,
       type: "debit",
       amount,
-      balance_after: user.token_balance,
+      balance_after: user.token_balance + user.free_token_balance,
       description: description ?? null,
       reference_id: referenceId ?? null,
     });
@@ -263,34 +269,35 @@ export async function listAllTransactions(
   const limit = options.limit ?? 50;
   const offset = options.offset ?? 0;
 
-  const qb = AppDataSource.createQueryBuilder(TokenTransactionEntity, "t")
-    .leftJoin("t.user", "u")
-    .select("t.id", "id")
-    .addSelect("t.user_id", "user_id")
-    .addSelect("t.type", "type")
-    .addSelect("t.amount", "amount")
-    .addSelect("t.balance_after", "balance_after")
-    .addSelect("t.description", "description")
-    .addSelect("t.reference_id", "reference_id")
-    .addSelect("t.created_at", "created_at")
-    .addSelect("u.email", "user_email")
-    .addSelect("u.name", "user_name");
+  // Build a helper to apply shared filters
+  const applyFilters = (qb: ReturnType<typeof AppDataSource.createQueryBuilder>) => {
+    if (options.type) qb.andWhere("t.type = :type", { type: options.type });
+    if (options.userId) qb.andWhere("t.user_id = :userId", { userId: options.userId });
+    return qb;
+  };
 
-  if (options.type) {
-    qb.andWhere("t.type = :type", { type: options.type });
-  }
+  // Run count and data queries in parallel
+  const countQb = applyFilters(AppDataSource.createQueryBuilder(TokenTransactionEntity, "t"));
 
-  if (options.userId) {
-    qb.andWhere("t.user_id = :userId", { userId: options.userId });
-  }
-
-  const total = await qb.getCount();
-
-  const transactions = await qb
+  const dataQb = applyFilters(
+    AppDataSource.createQueryBuilder(TokenTransactionEntity, "t")
+      .leftJoin("t.user", "u")
+      .select("t.id", "id")
+      .addSelect("t.user_id", "user_id")
+      .addSelect("t.type", "type")
+      .addSelect("t.amount", "amount")
+      .addSelect("t.balance_after", "balance_after")
+      .addSelect("t.description", "description")
+      .addSelect("t.reference_id", "reference_id")
+      .addSelect("t.created_at", "created_at")
+      .addSelect("u.email", "user_email")
+      .addSelect("u.name", "user_name"),
+  )
     .orderBy("t.created_at", "DESC")
     .skip(offset)
-    .take(limit)
-    .getRawMany();
+    .take(limit);
+
+  const [total, transactions] = await Promise.all([countQb.getCount(), dataQb.getRawMany()]);
 
   return {
     transactions: transactions as (TokenTransaction & { user_email: string; user_name: string })[],

@@ -136,7 +136,7 @@ class GatewayProxyService {
     estimatedTokens: number,
     description: string
   ): Promise<void> {
-    const balance = await tokenService.getBalance(userId);
+    const { balance } = await tokenService.getBalance(userId);
     if (balance < estimatedTokens) {
       throw Errors.insufficientBalance(balance, estimatedTokens);
     }

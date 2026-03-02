@@ -32,9 +32,18 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
       let packagePriceVnd: number | undefined;
       let explicitAmountVnd: number | undefined;
 
+      // Block negative/zero values
+      if (tokenAmount != null && (typeof tokenAmount !== "number" || tokenAmount <= 0)) {
+        res.status(400).json({ error: "tokenAmount phải là số dương", code: "BAD_REQUEST" });
+        return;
+      }
+      if (amountVnd != null && (typeof amountVnd !== "number" || amountVnd < 10000)) {
+        res.status(400).json({ error: "amountVnd tối thiểu 10.000đ", code: "BAD_REQUEST" });
+        return;
+      }
+
       // Priority: tierId > tokenAmount > amountVnd
       if (!tokenAmount && tierId) {
-        // Resolve tierId to tokenAmount + package price
         const pricing = await depositService.getPricingInfo();
         const pkg = pricing.packages.find((p) => p.id === tierId);
         if (!pkg) {
@@ -43,8 +52,9 @@ export async function createDeposit(req: Request, res: Response, next: NextFunct
         }
         tokenAmount = pkg.tokens;
         packagePriceVnd = pkg.priceVnd;
-      } else if (!tokenAmount && amountVnd) {
+      } else if (!tokenAmount && amountVnd && amountVnd > 0) {
         // Convert VND to tokens using base rate, keep original VND for QR
+        const { calculateTokensFromVnd } = await import("../db/models/deposits");
         tokenAmount = calculateTokensFromVnd(amountVnd);
         explicitAmountVnd = amountVnd;
       }
