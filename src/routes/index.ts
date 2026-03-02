@@ -23,3 +23,4 @@ export { default as questionRoutes } from "./question.routes";
 export { default as feedbackRoutes } from "./feedback.routes";
 export { default as anthropicProxyRoutes } from "./anthropic-proxy.routes";
 export { default as byteplusProxyRoutes } from "./byteplus-proxy.routes";
+export { default as cartRoutes } from "./cart.routes";

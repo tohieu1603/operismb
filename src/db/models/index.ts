@@ -25,6 +25,7 @@ export * as orders from "./orders";
 export * as reviews from "./reviews";
 export * as questions from "./questions";
 export * as feedbackReports from "./feedback-reports";
+export * as cart from "./cart";
 
 // Default exports for convenience
 export { default as customersRepo } from "./customers";
@@ -45,3 +46,4 @@ export { default as ordersRepo } from "./orders";
 export { default as reviewsRepo } from "./reviews";
 export { default as questionsRepo } from "./questions";
 export { default as feedbackReportsRepo } from "./feedback-reports";
+export { default as cartRepo } from "./cart";
