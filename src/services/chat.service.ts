@@ -403,9 +403,8 @@ class ChatService {
     }));
   }
 
-  async getBalance(userId: string): Promise<{ balance: number }> {
-    const balance = await tokenService.getBalance(userId);
-    return { balance };
+  async getBalance(userId: string) {
+    return tokenService.getBalance(userId);
   }
 
   async getConversations(userId: string): Promise<any[]> {

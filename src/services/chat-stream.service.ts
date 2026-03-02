@@ -7,13 +7,11 @@
 
 import type { Response } from "express";
 import { ApiError, ErrorCode, Errors } from "../core/errors/api-error";
-import { tokenService } from "./token.service";
-import { analyticsService } from "./analytics.service";
 import { usersRepo, chatMessagesRepo } from "../db/index";
 import { MSG } from "../constants/messages";
 
-// Config
-const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-6";
+// Config — model sent to gateway's /v1/chat/completions (set CHAT_MODEL in .env)
+const DEFAULT_MODEL = process.env.CHAT_MODEL || "byteplus/kimi-k2.5";
 const STREAM_TIMEOUT_MS = 600_000; // Total stream timeout — 10min for long agent runs (tool calls)
 const CHUNK_TIMEOUT_MS = 300_000; // Max wait between chunks — 5min for tool execution (browser, code, etc.)
 const KEEPALIVE_INTERVAL_MS = 15_000; // SSE keepalive ping to prevent tunnel idle timeout
@@ -345,25 +343,9 @@ async function streamMessage(
     const outputCost = (outputTokens / 1_000_000) * pricing.output;
     const totalCost = inputCost + outputCost;
 
-    // Deduct tokens and record analytics (single source of truth — byteplus proxy skips for gateway requests)
-    if (totalTokens > 0) {
-      await tokenService.debit(userId, totalTokens, `Chat: ${message.slice(0, 30)}...`);
-
-      await analyticsService.recordUsage({
-        user_id: userId,
-        request_type: "chat",
-        request_id: convId,
-        model: resolvedModel,
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        total_tokens: totalTokens,
-        cost_tokens: totalTokens,
-        metadata: {
-          message_preview: message.slice(0, 50),
-          stream: true,
-        },
-      });
-    }
+    // NOTE: Token deduction + analytics recording is handled by byteplus-proxy.routes.ts
+    // when the gateway forwards the actual AI call. Do NOT deduct/record here to avoid
+    // double-counting tokens and double-charging users.
 
     // Save user message (deferred — only on successful stream completion)
     await chatMessagesRepo.createMessage({

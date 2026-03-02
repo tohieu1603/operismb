@@ -638,6 +638,15 @@ function getSchedulerStatus(): { running: boolean; interval: number } {
   };
 }
 
+/**
+ * Get the next free token reset timestamp (ms since epoch).
+ * Based on the same window calculation used by processFreeTokenTopup.
+ */
+function getNextFreeResetAt(): number {
+  const currentWindow = Math.floor(Date.now() / FREE_TOPUP_WINDOW_MS);
+  return (currentWindow + 1) * FREE_TOPUP_WINDOW_MS;
+}
+
 export const cronService = {
   // CRUD
   createCronjob,
@@ -656,6 +665,8 @@ export const cronService = {
   startScheduler,
   stopScheduler,
   getSchedulerStatus,
+  // Free topup
+  getNextFreeResetAt,
   // Utilities
   isValidCronSchedule,
   calculateNextRun,
