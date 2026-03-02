@@ -153,6 +153,40 @@ export async function closePool(): Promise<void> {
 }
 
 /**
+ * Ensure the target database exists. Connects to the default `postgres` DB
+ * and creates the target DB if it doesn't exist. Safe to call multiple times.
+ */
+export async function ensureDatabase(): Promise<void> {
+  const dbName = process.env.DB_NAME || "operisagent";
+  const tempPool = new Pool({
+    host: process.env.DB_HOST || "127.0.0.1",
+    port: parseInt(process.env.DB_PORT || "5432", 10),
+    database: "postgres", // connect to default DB
+    user: process.env.DB_USER || "duc",
+    password: String(process.env.DB_PASSWORD || "080103"),
+    ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
+    max: 1,
+  });
+
+  try {
+    const result = await tempPool.query(
+      "SELECT 1 FROM pg_database WHERE datname = $1",
+      [dbName],
+    );
+
+    if (result.rowCount === 0) {
+      // Use double-quote identifier to handle special chars in DB name
+      await tempPool.query(`CREATE DATABASE "${dbName}"`);
+      console.log(`[db] Database "${dbName}" created`);
+    } else {
+      console.log(`[db] Database "${dbName}" exists`);
+    }
+  } finally {
+    await tempPool.end();
+  }
+}
+
+/**
  * Run database migrations
  */
 export async function runMigrations(): Promise<void> {

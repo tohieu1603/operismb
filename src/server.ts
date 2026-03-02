@@ -12,7 +12,7 @@ import cookieParser from "cookie-parser";
 import swaggerUi from "swagger-ui-express";
 import { operisRouter } from "./index";
 import { allowHostsMiddleware } from "./middleware/allow-hosts.middleware";
-import { getPool, runMigrations } from "./db/connection";
+import { getPool, runMigrations, ensureDatabase } from "./db/connection";
 import { AppDataSource } from "./db/data-source";
 import openaiCompatRoutes from "./routes/openai-compat.routes";
 import anthropicCompatRoutes from "./routes/anthropic-compat.routes";
@@ -34,7 +34,8 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_HOSTS || "localhost,127.0.0.1")
 async function main() {
   // Initialize database
   console.log("[server] Initializing database...");
-  getPool(); // Initialize pool
+  await ensureDatabase();
+  getPool();
   await runMigrations();
 
   // Initialize TypeORM
