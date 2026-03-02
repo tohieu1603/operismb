@@ -100,22 +100,33 @@ class ChatMessagesRepo {
   }
 
   /**
-   * Get all conversations for a user
+   * Get all conversations for a user, sorted by most recent activity.
+   * Uses LATERAL JOIN for optimal performance with composite index
+   * (user_id, conversation_id, created_at DESC).
    */
   async getUserConversations(
     userId: string,
     limit: number = 20,
   ): Promise<{ conversation_id: string; last_message: string; created_at: Date }[]> {
-    // Use raw query for DISTINCT ON (PostgreSQL-specific)
     const results = await AppDataSource.query(
-      `SELECT DISTINCT ON (conversation_id)
-        conversation_id,
-        content as last_message,
-        created_at
-       FROM chat_messages
-       WHERE user_id = $1::uuid
-       ORDER BY conversation_id, created_at DESC
-       LIMIT $2`,
+      `SELECT m.conversation_id, m.content AS last_message, m.created_at
+       FROM (
+         SELECT conversation_id, MAX(created_at) AS last_msg_at
+         FROM chat_messages
+         WHERE user_id = $1::uuid
+         GROUP BY conversation_id
+         ORDER BY last_msg_at DESC
+         LIMIT $2
+       ) top_convs
+       CROSS JOIN LATERAL (
+         SELECT conversation_id, content, created_at
+         FROM chat_messages
+         WHERE user_id = $1::uuid
+           AND conversation_id = top_convs.conversation_id
+         ORDER BY created_at DESC
+         LIMIT 1
+       ) m
+       ORDER BY m.created_at DESC`,
       [userId, limit],
     );
     return results;
