@@ -223,13 +223,10 @@ export async function listAllDeposits(
     countQb.andWhere("d.user_id = :userId", { userId: options.userId });
   }
 
-  const total = await countQb.getCount();
-
-  const rawResults = await qb
-    .orderBy("d.created_at", "DESC")
-    .limit(limit)
-    .offset(offset)
-    .getRawMany();
+  const [total, rawResults] = await Promise.all([
+    countQb.getCount(),
+    qb.orderBy("d.created_at", "DESC").limit(limit).offset(offset).getRawMany(),
+  ]);
 
   const deposits = rawResults.map((row) => ({
     id: row.d_id,

@@ -269,34 +269,35 @@ export async function listAllTransactions(
   const limit = options.limit ?? 50;
   const offset = options.offset ?? 0;
 
-  const qb = AppDataSource.createQueryBuilder(TokenTransactionEntity, "t")
-    .leftJoin("t.user", "u")
-    .select("t.id", "id")
-    .addSelect("t.user_id", "user_id")
-    .addSelect("t.type", "type")
-    .addSelect("t.amount", "amount")
-    .addSelect("t.balance_after", "balance_after")
-    .addSelect("t.description", "description")
-    .addSelect("t.reference_id", "reference_id")
-    .addSelect("t.created_at", "created_at")
-    .addSelect("u.email", "user_email")
-    .addSelect("u.name", "user_name");
+  // Build a helper to apply shared filters
+  const applyFilters = (qb: ReturnType<typeof AppDataSource.createQueryBuilder>) => {
+    if (options.type) qb.andWhere("t.type = :type", { type: options.type });
+    if (options.userId) qb.andWhere("t.user_id = :userId", { userId: options.userId });
+    return qb;
+  };
 
-  if (options.type) {
-    qb.andWhere("t.type = :type", { type: options.type });
-  }
+  // Run count and data queries in parallel
+  const countQb = applyFilters(AppDataSource.createQueryBuilder(TokenTransactionEntity, "t"));
 
-  if (options.userId) {
-    qb.andWhere("t.user_id = :userId", { userId: options.userId });
-  }
-
-  const total = await qb.getCount();
-
-  const transactions = await qb
+  const dataQb = applyFilters(
+    AppDataSource.createQueryBuilder(TokenTransactionEntity, "t")
+      .leftJoin("t.user", "u")
+      .select("t.id", "id")
+      .addSelect("t.user_id", "user_id")
+      .addSelect("t.type", "type")
+      .addSelect("t.amount", "amount")
+      .addSelect("t.balance_after", "balance_after")
+      .addSelect("t.description", "description")
+      .addSelect("t.reference_id", "reference_id")
+      .addSelect("t.created_at", "created_at")
+      .addSelect("u.email", "user_email")
+      .addSelect("u.name", "user_name"),
+  )
     .orderBy("t.created_at", "DESC")
     .skip(offset)
-    .take(limit)
-    .getRawMany();
+    .take(limit);
+
+  const [total, transactions] = await Promise.all([countQb.getCount(), dataQb.getRawMany()]);
 
   return {
     transactions: transactions as (TokenTransaction & { user_email: string; user_name: string })[],
