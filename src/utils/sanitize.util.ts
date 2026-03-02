@@ -19,7 +19,7 @@ export function escapeHtml(str: string): string {
 }
 
 export function sanitizeUser(user: OperisUser): SafeUser {
-  const { password_hash: _, gateway_token: _gt, gateway_hooks_token: _ght, auth_profiles_path: _app, ...safe } = user;
+  const { password_hash: _, gateway_token: _gt, gateway_hooks_token: _ght, ...safe } = user;
   return safe;
 }
 
