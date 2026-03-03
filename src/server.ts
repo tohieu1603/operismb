@@ -106,7 +106,10 @@ async function main() {
   // Anthropic OAuth proxy — forwards raw requests to api.anthropic.com using server-side token
   app.use("/v1/anthropic", anthropicProxyRoutes);
 
-  // BytePlus proxy — forwards OpenAI-compatible requests to BytePlus Ark API using server-side key
+  // LLM proxy — forwards OpenAI-compatible requests to BytePlus Ark API using server-side key
+  app.use("/v1/operis", byteplusProxyRoutes);
+  app.use("/api/v1/operis", byteplusProxyRoutes);
+  // Legacy paths (keep for backwards compatibility)
   app.use("/v1/byteplus", byteplusProxyRoutes);
   app.use("/api/v1/byteplus", byteplusProxyRoutes);
 
@@ -127,10 +130,30 @@ main().catch((err) => {
   process.exit(1);
 });
 
+// Graceful shutdown — close DB pools, stop cron, then exit
+async function shutdown(signal: string) {
+  console.log(`[server] ${signal} received, shutting down...`);
+  try {
+    const { cronService } = await import("./services/cron.service");
+    cronService.stopScheduler();
+    const { closePool } = await import("./db/connection");
+    await closePool();
+    const { AppDataSource } = await import("./db/data-source");
+    if (AppDataSource.isInitialized) await AppDataSource.destroy();
+  } catch (e) {
+    // ignore cleanup errors
+  }
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
 // Prevent unhandled errors from crashing the server
 process.on("uncaughtException", (err) => {
   console.error(`[FATAL] Uncaught Exception: ${err.message}`);
   console.error(err.stack);
+  process.exit(1);
 });
 
 process.on("unhandledRejection", (reason) => {

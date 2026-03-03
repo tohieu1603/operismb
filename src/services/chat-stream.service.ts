@@ -8,10 +8,12 @@
 import type { Response } from "express";
 import { ApiError, ErrorCode, Errors } from "../core/errors/api-error";
 import { usersRepo, chatMessagesRepo } from "../db/index";
+import { tokenService } from "./token.service";
+import { analyticsService } from "./analytics.service";
 import { MSG } from "../constants/messages";
 
 // Config — model sent to gateway's /v1/chat/completions (set CHAT_MODEL in .env)
-const DEFAULT_MODEL = process.env.CHAT_MODEL || "byteplus/kimi-k2.5";
+const DEFAULT_MODEL = process.env.CHAT_MODEL || "operis/operis-multi";
 const STREAM_TIMEOUT_MS = 600_000; // Total stream timeout — 10min for long agent runs (tool calls)
 const CHUNK_TIMEOUT_MS = 300_000; // Max wait between chunks — 5min for tool execution (browser, code, etc.)
 const KEEPALIVE_INTERVAL_MS = 15_000; // SSE keepalive ping to prevent tunnel idle timeout
@@ -288,6 +290,26 @@ async function streamMessage(
             }
             if (isAuthError) break;
           }
+
+          // Process remaining buffer (usage chunk may not end with \n)
+          if (buffer.trim()) {
+            for (const line of buffer.split("\n")) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim();
+                if (data === "[DONE]") continue;
+                try {
+                  const chunk = JSON.parse(data);
+                  if (!actualModel && chunk.model) actualModel = chunk.model;
+                  if (chunk.usage) {
+                    inputTokens = chunk.usage.prompt_tokens || 0;
+                    outputTokens = chunk.usage.completion_tokens || 0;
+                    totalTokens = chunk.usage.total_tokens || 0;
+                    contextWindow = chunk.usage.context_window || 0;
+                  }
+                } catch { /* skip */ }
+              }
+            }
+          }
         } finally {
           // Always cancel reader to close gateway connection and stop processing
           reader.cancel().catch(() => {});
@@ -343,9 +365,27 @@ async function streamMessage(
     const outputCost = (outputTokens / 1_000_000) * pricing.output;
     const totalCost = inputCost + outputCost;
 
-    // NOTE: Token deduction + analytics recording is handled by byteplus-proxy.routes.ts
-    // when the gateway forwards the actual AI call. Do NOT deduct/record here to avoid
-    // double-counting tokens and double-charging users.
+    // Deduct tokens from logged-in user (JWT)
+    if (totalTokens > 0) {
+      const currentBalance = (user.token_balance ?? 0) + (user.free_token_balance ?? 0);
+      if (currentBalance < totalTokens) {
+        sendSSE(res, "error", { error: "Insufficient token balance" });
+        res.end();
+        return;
+      }
+      await tokenService.debit(userId, totalTokens, `Chat: ${message.slice(0, 30)}...`);
+      await analyticsService.recordUsage({
+        user_id: userId,
+        request_type: "chat",
+        request_id: convId,
+        model: resolvedModel,
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        total_tokens: totalTokens,
+        cost_tokens: totalTokens,
+        metadata: { message_preview: message.slice(0, 50) },
+      });
+    }
 
     // Save user message (deferred — only on successful stream completion)
     await chatMessagesRepo.createMessage({

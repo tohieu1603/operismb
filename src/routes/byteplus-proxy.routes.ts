@@ -9,8 +9,6 @@
 
 import { Router, type Request, type Response } from "express";
 import { apiKeyService } from "../services/api-key.service";
-import { tokenService } from "../services/token.service";
-import { analyticsService } from "../services/analytics.service";
 import { usersRepo } from "../db/index";
 import { asyncHandler } from "../middleware/error.middleware";
 import { verifyAccessToken } from "../utils/jwt.util";
@@ -59,41 +57,6 @@ function getByteplusApiKey(): string {
   return BYTEPLUS_API_KEY;
 }
 
-/** Deduct tokens from user balance and record analytics (fire-and-forget) */
-async function deductTokens(
-  userId: string,
-  model: string,
-  usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number },
-): Promise<void> {
-  if (usage.total_tokens <= 0) return;
-
-  try {
-    // Deduct from balance
-    await tokenService.debit(
-      userId,
-      usage.total_tokens,
-      `BytePlus ${model}: ${usage.prompt_tokens} in + ${usage.completion_tokens} out`,
-    );
-
-    // Record analytics
-    await analyticsService.recordUsage({
-      user_id: userId,
-      request_type: "chat",
-      model,
-      input_tokens: usage.prompt_tokens,
-      output_tokens: usage.completion_tokens,
-      total_tokens: usage.total_tokens,
-      cost_tokens: usage.total_tokens,
-      metadata: { provider: "byteplus", proxy: true },
-    });
-
-    console.log(`[byteplus-proxy] Deducted ${usage.total_tokens} tokens from user ${userId}`);
-  } catch (err) {
-    // Log but don't fail the request — tokens already streamed
-    console.error("[byteplus-proxy] Token deduction failed:", err);
-  }
-}
-
 /**
  * POST /chat/completions
  * Proxy OpenAI-compatible chat completions to BytePlus with token tracking.
@@ -139,8 +102,14 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
     return;
   }
 
-  // 3. Prepare body — ensure stream_options + log vision content
+  // 3. Prepare body — map model aliases + ensure stream_options
+  const MODEL_MAP: Record<string, string> = {
+    "operis-multi": "kimi-k2.5",
+  };
   const body = { ...req.body };
+  if (body.model && MODEL_MAP[body.model]) {
+    body.model = MODEL_MAP[body.model];
+  }
   if (isStreaming) {
     body.stream_options = { ...body.stream_options, include_usage: true };
   }
@@ -224,14 +193,30 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
             } catch { /* skip invalid JSON */ }
           }
         }
+        // Process remaining buffer (usage chunk may not end with \n)
+        if (buffer.trim()) {
+          for (const line of buffer.split("\n")) {
+            if (!line.startsWith("data: ") || line.includes("[DONE]")) continue;
+            try {
+              const chunk = JSON.parse(line.slice(6));
+              if (chunk.usage) {
+                usage = {
+                  prompt_tokens: chunk.usage.prompt_tokens || 0,
+                  completion_tokens: chunk.usage.completion_tokens || 0,
+                  total_tokens: chunk.usage.total_tokens || 0,
+                };
+              }
+            } catch { /* skip */ }
+          }
+        }
       } catch (err) {
         console.error("[byteplus-proxy] Stream error:", err);
       }
 
       res.end();
 
-      // Deduct tokens after stream completes (fire-and-forget)
-      deductTokens(userId, model, usage);
+      // Log usage only (deduction handled by upstream chat-stream for Flow 1)
+      console.log(`[byteplus-proxy] Stream usage: ${usage.total_tokens} tokens (model=${model}, user=${userId})`);
 
     } else {
       // Non-stream: parse response, deduct, forward
@@ -245,11 +230,7 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
       try {
         const parsed = JSON.parse(responseText);
         if (parsed.usage) {
-          deductTokens(userId, model, {
-            prompt_tokens: parsed.usage.prompt_tokens || 0,
-            completion_tokens: parsed.usage.completion_tokens || 0,
-            total_tokens: parsed.usage.total_tokens || 0,
-          });
+          console.log(`[byteplus-proxy] Non-stream usage: ${parsed.usage.total_tokens} tokens (model=${model}, user=${userId})`);
         }
       } catch { /* skip parse error */ }
     }

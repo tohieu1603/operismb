@@ -20,7 +20,7 @@
 import { Router } from "express";
 import { chatController } from "../controllers/chat.controller";
 import { chatStreamController } from "../controllers/chat-stream.controller";
-import { authMiddleware, hybridAuthMiddleware, asyncHandler } from "../middleware/index";
+import { authMiddleware, asyncHandler } from "../middleware/index";
 
 const router = Router();
 
@@ -163,9 +163,7 @@ const router = Router();
  */
 router.post(
   "/",
-  asyncHandler(async (req, res, next) => {
-    await hybridAuthMiddleware(req, res, next);
-  }),
+  authMiddleware,
   asyncHandler((req, res) => chatController.sendMessage(req, res)),
 );
 
@@ -260,9 +258,7 @@ router.post(
  */
 router.post(
   "/stream",
-  asyncHandler(async (req, res, next) => {
-    await hybridAuthMiddleware(req, res, next);
-  }),
+  authMiddleware,
   asyncHandler((req, res) => chatStreamController.streamMessage(req, res)),
 );
 
