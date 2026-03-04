@@ -12,6 +12,7 @@ import { apiKeyService } from "../services/api-key.service";
 import { usersRepo } from "../db/index";
 import { asyncHandler } from "../middleware/error.middleware";
 import { verifyAccessToken } from "../utils/jwt.util";
+import { tokenService } from "../services/token.service";
 import { MSG } from "../constants/messages";
 
 const router = Router();
@@ -215,24 +216,45 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
 
       res.end();
 
-      // Log usage only (deduction handled by upstream chat-stream for Flow 1)
-      console.log(`[byteplus-proxy] Stream usage: ${usage.total_tokens} tokens (model=${model}, user=${userId})`);
+      // Deduct tokens based on API key user
+      if (usage.total_tokens > 0) {
+        try {
+          const result = await tokenService.deductUsage(userId, {
+            prompt_tokens: usage.prompt_tokens,
+            completion_tokens: usage.completion_tokens,
+            total_tokens: usage.total_tokens,
+            model,
+            request_type: "chat",
+          });
+          console.log(`[byteplus-proxy] Stream deducted: ${result.deducted} tokens (model=${model}, user=${userId}, balance=${result.balance})`);
+        } catch (err) {
+          console.error(`[byteplus-proxy] Deduction failed: ${err} (model=${model}, user=${userId}, tokens=${usage.total_tokens})`);
+        }
+      }
 
     } else {
-      // Non-stream: parse response, deduct, forward
+      // Non-stream: forward response, then deduct
       const responseText = await byteplusRes.text();
 
-      // Forward response to client immediately
       res.setHeader("content-type", "application/json");
       res.send(responseText);
 
-      // Parse usage and deduct
+      // Parse usage and deduct tokens
       try {
         const parsed = JSON.parse(responseText);
-        if (parsed.usage) {
-          console.log(`[byteplus-proxy] Non-stream usage: ${parsed.usage.total_tokens} tokens (model=${model}, user=${userId})`);
+        if (parsed.usage?.total_tokens > 0) {
+          const result = await tokenService.deductUsage(userId, {
+            prompt_tokens: parsed.usage.prompt_tokens || 0,
+            completion_tokens: parsed.usage.completion_tokens || 0,
+            total_tokens: parsed.usage.total_tokens,
+            model,
+            request_type: "chat",
+          });
+          console.log(`[byteplus-proxy] Non-stream deducted: ${result.deducted} tokens (model=${model}, user=${userId}, balance=${result.balance})`);
         }
-      } catch { /* skip parse error */ }
+      } catch (err) {
+        console.error(`[byteplus-proxy] Deduction failed: ${err} (model=${model}, user=${userId})`);
+      }
     }
   } catch (err: any) {
     clearTimeout(timeoutId);
