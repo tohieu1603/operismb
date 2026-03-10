@@ -12,6 +12,7 @@ import { apiKeyService } from "../services/api-key.service";
 import { usersRepo } from "../db/index";
 import { asyncHandler } from "../middleware/error.middleware";
 import { verifyAccessToken } from "../utils/jwt.util";
+import { ACCESS_COOKIE } from "../utils/cookie.util";
 import { tokenService } from "../services/token.service";
 import { MSG } from "../constants/messages";
 
@@ -21,12 +22,21 @@ const BYTEPLUS_API_URL = process.env.BYTEPLUS_API_URL || "https://ark.ap-southea
 const BYTEPLUS_API_KEY = process.env.BYTEPLUS_API_KEY || "";
 const PROXY_TIMEOUT_MS = 300_000; // 5 min for long completions
 
-/** Authenticate client via JWT Bearer token or API key (x-api-key / Bearer sk_...) */
+/** Authenticate client via HttpOnly cookie, JWT Bearer token, or API key */
 async function authenticateClient(req: Request): Promise<string | null> {
   const authHeader = req.headers.authorization;
   const xApiKey = req.headers["x-api-key"] as string | undefined;
 
-  // 1. Try JWT token (Bearer eyJ...)
+  // 1. Try HttpOnly cookie first (for browser/admin frontend)
+  const cookieToken = req.cookies?.[ACCESS_COOKIE];
+  if (cookieToken) {
+    try {
+      const payload = verifyAccessToken(cookieToken);
+      if (payload?.userId) return payload.userId;
+    } catch { /* invalid cookie — fall through */ }
+  }
+
+  // 2. Try JWT token (Bearer eyJ...)
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7).trim();
     if (token.startsWith("eyJ")) {
@@ -42,7 +52,7 @@ async function authenticateClient(req: Request): Promise<string | null> {
     return result?.userId ?? null;
   }
 
-  // 2. Try x-api-key header
+  // 3. Try x-api-key header
   if (xApiKey) {
     const result = await apiKeyService.validateKey(xApiKey);
     return result?.userId ?? null;
