@@ -147,9 +147,16 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
     if (!byteplusRes.ok) {
       const errorBody = await byteplusRes.text();
       console.error("[byteplus-proxy] BytePlus error:", byteplusRes.status, errorBody);
-      res.status(byteplusRes.status);
-      res.setHeader("content-type", "application/json");
-      res.send(errorBody);
+      // Map upstream status to safe client error — never expose provider details
+      const safeStatus = byteplusRes.status === 429 ? 429 : byteplusRes.status >= 500 ? 502 : 400;
+      const safeMessages: Record<number, string> = {
+        429: "Rate limit exceeded. Please retry later.",
+        502: "Upstream service temporarily unavailable.",
+        400: "Request failed. Please check your parameters.",
+      };
+      res.status(safeStatus).json({
+        error: { message: safeMessages[safeStatus], type: "api_error" },
+      });
       return;
     }
 
@@ -264,8 +271,8 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
       });
     } else {
       console.error("[byteplus-proxy] Fetch error:", err);
-      res.status(500).json({
-        error: { message: err.message || "Internal error", type: "api_error" },
+      res.status(502).json({
+        error: { message: "Service temporarily unavailable.", type: "api_error" },
       });
     }
   }

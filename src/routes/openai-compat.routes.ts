@@ -378,7 +378,7 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
     console.error("[openai-compat] Error:", error);
     res.status(500).json({
       error: {
-        message: error.message || "Internal server error",
+        message: "Service temporarily unavailable.",
         type: "api_error",
       },
     });

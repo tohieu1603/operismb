@@ -454,7 +454,7 @@ router.post("/messages", asyncHandler(async (req: Request, res: Response) => {
       type: "error",
       error: {
         type: "api_error",
-        message: error.message || "Internal server error",
+        message: "Service temporarily unavailable.",
       },
     });
   }

@@ -192,9 +192,9 @@ router.post(["/v1/messages", "/messages"], asyncHandler(async (req: Request, res
       });
     } else {
       console.error("[anthropic-proxy] Fetch error:", err);
-      res.status(500).json({
+      res.status(502).json({
         type: "error",
-        error: { type: "api_error", message: err.message || "Internal error" },
+        error: { type: "api_error", message: "Service temporarily unavailable." },
       });
     }
   }
@@ -491,8 +491,8 @@ router.post("/chat/completions", asyncHandler(async (req: Request, res: Response
     }
   } catch (err: any) {
     clearTimeout(timeoutId);
-    res.status(err.name === "AbortError" ? 504 : 500).json({
-      error: { message: err.message || "Internal error", type: "api_error" },
+    res.status(err.name === "AbortError" ? 504 : 502).json({
+      error: { message: err.name === "AbortError" ? "Request timed out." : "Service temporarily unavailable.", type: "api_error" },
     });
   }
 }));

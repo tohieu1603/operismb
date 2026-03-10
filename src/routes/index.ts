@@ -24,3 +24,16 @@ export { default as feedbackRoutes } from "./feedback.routes";
 export { default as anthropicProxyRoutes } from "./anthropic-proxy.routes";
 export { default as byteplusProxyRoutes } from "./byteplus-proxy.routes";
 export { default as cartRoutes } from "./cart.routes";
+
+// Post system routes
+export { default as postRoutes } from "./post.routes";
+export { default as postCategoryRoutes } from "./post-category.routes";
+export { default as postTagRoutes } from "./post-tag.routes";
+export { default as postAuthorRoutes } from "./post-author.routes";
+export { default as mediaRoutes } from "./media.routes";
+export { default as keywordRoutes } from "./keyword.routes";
+export { default as seoRoutes } from "./seo.routes";
+export { default as redirectRoutes } from "./redirect.routes";
+export { default as pageContentRoutes } from "./page-content.routes";
+export { default as dictionaryRoutes } from "./dictionary.routes";
+export { default as postAnalyticsRoutes } from "./post-analytics.routes";

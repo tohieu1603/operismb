@@ -47,3 +47,19 @@ export { default as reviewsRepo } from "./reviews";
 export { default as questionsRepo } from "./questions";
 export { default as feedbackReportsRepo } from "./feedback-reports";
 export { default as cartRepo } from "./cart";
+
+// Post system repositories
+export * as postsRepo from "./posts";
+export * as postCategoriesRepo from "./post-categories";
+export * as postTagsRepo from "./post-tags";
+export * as postAuthorsRepo from "./post-authors";
+export * as mediaFilesRepo from "./media-files";
+export * as keywordsRepo from "./keywords";
+export * as seoScoresRepo from "./seo-scores";
+export * as seoLogsRepo from "./seo-logs";
+export * as redirectsRepo from "./redirects";
+export * as pageContentsRepo from "./page-contents";
+export * as dictionariesRepo from "./dictionaries";
+export * as postAnalyticsRepo from "./post-analytics";
+export * as activityLogsRepo from "./activity-logs";
+export * as indexStatusesRepo from "./index-statuses";

@@ -19,3 +19,19 @@ export { TokenTransactionEntity } from './token-transaction.entity';
 export { TokenUsageEntity } from './token-usage.entity';
 export { ChatMessageEntity } from './chat-message.entity';
 export { UserChannelEntity } from './user-channel.entity';
+
+// Post BE Entities
+export { PostCategoryEntity } from './post-category.entity';
+export { PostTagEntity } from './post-tag.entity';
+export { PostAuthorEntity } from './post-author.entity';
+export { PostEntity } from './post.entity';
+export { MediaEntity } from './media.entity';
+export { KeywordEntity } from './keyword.entity';
+export { SeoScoreEntity } from './seo-score.entity';
+export { SeoLogEntity } from './seo-log.entity';
+export { RedirectEntity } from './redirect.entity';
+export { PageContentEntity } from './page-content.entity';
+export { DictionaryEntity } from './dictionary.entity';
+export { PostAnalyticsEntity, PostDailyStatsEntity } from './post-analytics.entity';
+export { ActivityLogEntity } from './activity-log.entity';
+export { IndexStatusEntity } from './index-status.entity';

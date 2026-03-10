@@ -26,6 +26,17 @@ import {
   questionRoutes,
   feedbackRoutes,
   cartRoutes,
+  postRoutes,
+  postCategoryRoutes,
+  postTagRoutes,
+  postAuthorRoutes,
+  mediaRoutes,
+  keywordRoutes,
+  seoRoutes,
+  redirectRoutes,
+  pageContentRoutes,
+  dictionaryRoutes,
+  postAnalyticsRoutes,
 } from "./routes/index";
 import { errorMiddleware } from "./middleware/index";
 
@@ -57,6 +68,19 @@ operisRouter.use("/feedback", feedbackRoutes);
 operisRouter.use("/cart", cartRoutes);
 operisRouter.use("/", reviewRoutes);
 operisRouter.use("/", questionRoutes);
+
+// Post system routes
+operisRouter.use("/posts", postRoutes);
+operisRouter.use("/post-categories", postCategoryRoutes);
+operisRouter.use("/post-tags", postTagRoutes);
+operisRouter.use("/post-authors", postAuthorRoutes);
+operisRouter.use("/media", mediaRoutes);
+operisRouter.use("/keywords", keywordRoutes);
+operisRouter.use("/seo", seoRoutes);
+operisRouter.use("/redirects", redirectRoutes);
+operisRouter.use("/page-content", pageContentRoutes);
+operisRouter.use("/dictionary", dictionaryRoutes);
+operisRouter.use("/post-analytics", postAnalyticsRoutes);
 
 // Global error handler - must be last
 operisRouter.use(errorMiddleware);

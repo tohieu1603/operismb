@@ -5,6 +5,7 @@
 import "reflect-metadata";
 import "dotenv/config";
 import cluster from "node:cluster";
+import path from "node:path";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -86,6 +87,14 @@ async function main() {
     next();
   });
 
+  // Serve uploaded files (images, documents, etc.)
+  // Allow cross-origin access so frontend on different port can load images
+  const uploadDir = process.env.UPLOAD_DIR || "uploads";
+  app.use("/uploads", (_req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  }, express.static(path.resolve(uploadDir)));
+
   // Health check at root
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -112,6 +121,10 @@ async function main() {
   // Legacy paths (keep for backwards compatibility)
   app.use("/v1/byteplus", byteplusProxyRoutes);
   app.use("/api/v1/byteplus", byteplusProxyRoutes);
+
+  // Global error handler — catch all unhandled errors, never expose internals
+  const { errorMiddleware } = await import("./middleware/error.middleware");
+  app.use(errorMiddleware);
 
   app.listen(PORT, HOST, () => {
     console.log(`[server] Operis API running at http://${HOST}:${PORT}`);

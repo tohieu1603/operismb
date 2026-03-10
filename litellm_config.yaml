@@ -1,0 +1,65 @@
+model_list:
+  # === operis-multi: primary model with fallback ===
+  - model_name: "operis-multi"
+    litellm_params:
+      model: "openai/kimi-k2.5"
+      api_base: "https://ark.ap-southeast.bytepluses.com/api/coding/v3"
+      api_key: "os.environ/BYTEPLUS_API_KEY"
+
+  # === Individual models ===
+  - model_name: "kimi-k2.5"
+    litellm_params:
+      model: "openai/kimi-k2.5"
+      api_base: "https://ark.ap-southeast.bytepluses.com/api/coding/v3"
+      api_key: "os.environ/BYTEPLUS_API_KEY"
+
+  - model_name: "gpt-oss-120b"
+    litellm_params:
+      model: "openai/gpt-oss-120b-250805"
+      api_base: "https://ark.ap-southeast.bytepluses.com/api/coding/v3"
+      api_key: "os.environ/BYTEPLUS_API_KEY"
+
+  - model_name: "deepseek-v3.2"
+    litellm_params:
+      model: "openai/deepseek-v3-2-251201"
+      api_base: "https://ark.ap-southeast.bytepluses.com/api/v3"
+      api_key: "os.environ/BYTEPLUS_API_KEY"
+
+  - model_name: "deepseek-r1"
+    litellm_params:
+      model: "openai/deepseek-r1-250528"
+      api_base: "https://ark.ap-southeast.bytepluses.com/api/v3"
+      api_key: "os.environ/BYTEPLUS_API_KEY"
+
+  - model_name: "kimi-k2-thinking"
+    litellm_params:
+      model: "openai/kimi-k2-thinking-251104"
+      api_base: "https://ark.ap-southeast.bytepluses.com/api/v3"
+      api_key: "os.environ/BYTEPLUS_API_KEY"
+
+  - model_name: "glm-4-7"
+    litellm_params:
+      model: "openai/glm-4-7-251222"
+      api_base: "https://ark.ap-southeast.bytepluses.com/api/v3"
+      api_key: "os.environ/BYTEPLUS_API_KEY"
+
+  - model_name: "seed-1.6-flash"
+    litellm_params:
+      model: "openai/seed-1-6-flash-250715"
+      api_base: "https://ark.ap-southeast.bytepluses.com/api/v3"
+      api_key: "os.environ/BYTEPLUS_API_KEY"
+
+router_settings:
+  routing_strategy: "simple-shuffle"
+  num_retries: 2
+  timeout: 300
+  fallbacks:
+    # operis-multi lỗi → fallback gpt-oss → deepseek-v3.2
+    - operis-multi: ["gpt-oss-120b", "deepseek-v3.2"]
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+
+general_settings:
+  master_key: "sk-litellm-master-operis-2026"
