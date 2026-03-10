@@ -18,8 +18,9 @@ async function fixImports(dir) {
     let changed = false;
 
     // Fix relative imports/exports: from "./foo" → from "./foo.js"
+    // Also fix dynamic imports: import("./foo") → import("./foo.js")
     const fixed = content.replace(
-      /(from\s+["'])(\.\.?\/[^"']+)(["'])/g,
+      /((?:from|import\()\s*["'])(\.\.?\/[^"']+)(["'])/g,
       (match, prefix, importPath, suffix) => {
         // Skip if already has .js or .json extension
         if (importPath.endsWith(".js") || importPath.endsWith(".json")) return match;
